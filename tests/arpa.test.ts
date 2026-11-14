@@ -100,6 +100,28 @@ describe("ARPA acquisition and tracking", () => {
     expect(DEFAULT_ARPA_ASSOCIATION_GATE_NM).toBeGreaterThan(0);
   });
 
+
+  it("assigns each radar echo to at most one active ARPA track", () => {
+    const tracks: ArpaTrackSet = {
+      A: acquireArpaTarget({ id: "A", xNm: 0, yNm: 0 }, 0),
+      B: acquireArpaTarget({ id: "B", xNm: 0.01, yNm: 0 }, 0),
+    };
+    const next = updateArpaTracks(tracks, [{ id: "ECHO", xNm: 0.005, yNm: 0 }], 2.5);
+    const updated = Object.values(next).filter((track) => track.lastMeasurementSeconds === 2.5);
+    expect(updated).toHaveLength(1);
+    expect(updated[0].associatedRadarId).toBe("ECHO");
+  });
+
+  it("keeps a bounded rolling history of eight measurements", () => {
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget({ id: "T1", xNm: 0, yNm: 0 }, 0) };
+    for (let scan = 1; scan <= 12; scan += 1) {
+      tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: scan * 0.001, yNm: 0 }], scan * 2.5);
+    }
+    expect(tracks.T1.measurements).toHaveLength(8);
+    expect(tracks.T1.measurements[0].timeSeconds).toBe(12.5);
+    expect(tracks.T1.measurements[7].timeSeconds).toBe(30);
+  });
+
   it("calculates Trial Manoeuvre without changing the original own-ship solution", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 2.5 }], 2.5);
