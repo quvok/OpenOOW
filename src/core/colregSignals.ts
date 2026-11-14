@@ -104,6 +104,44 @@ export const SOUND_SIGNALS: SoundSignalGuidance[] = [
   { rule: 37, pattern: "Красные ракеты/звёзды, красный фальшфейер, оранжевый дым, пламя, флаги и другие сигналы Annex IV", meaning: "Визуальные и пиротехнические сигналы бедствия", context: "Не использовать для учебной имитации в реальной акватории; ложные сигналы могут вызвать аварийный ответ служб." },
 ];
 
+
+export interface RestrictedVisibilitySignalProfile {
+  kind: ColregVesselKind;
+  lengthM: number;
+  underway: boolean;
+  makingWay: boolean;
+  underSailAndPower?: boolean;
+  wigOnSurface?: boolean;
+}
+
+export function getRestrictedVisibilitySignal(profile: RestrictedVisibilitySignalProfile): SoundSignalGuidance | null {
+  if (!Number.isFinite(profile.lengthM) || profile.lengthM <= 0) {
+    throw new RangeError("Vessel length must be finite and greater than zero.");
+  }
+  if (profile.lengthM < 12) {
+    return { rule: 35, pattern: "Иной эффективный звуковой сигнал через интервалы не более 2 минут", meaning: "Судно длиной менее 12 м", context: "Правило 35(g): вместо установленных сигналов должно подаваться иное эффективное звуковое средство." };
+  }
+  if (profile.kind === "anchored") {
+    return { rule: 35, pattern: "Колокол быстрым звоном около 5 секунд через интервалы не более 1 минуты", meaning: "Судно на якоре", context: profile.lengthM >= 100 ? "После звона колокола подаётся гонг в кормовой части." : "Дополнительно может подаваться три коротких звука для предупреждения приближающегося судна." };
+  }
+  if (profile.kind === "aground") {
+    return { rule: 35, pattern: "Колокол; три отчётливых удара до и после быстрого звона", meaning: "Судно на мели", context: profile.lengthM >= 100 ? "Для судна 100 м и более также применяется гонг." : "Дополнительный сигнал судна на мели." };
+  }
+  if (profile.kind === "nuc" || profile.kind === "ram" || profile.kind === "constrained-draught" ||
+      profile.kind === "sailing" && !profile.underSailAndPower ||
+      profile.kind === "fishing" && true ||
+      profile.kind === "towing") {
+    return { rule: 35, pattern: "1 продолжительный + 2 коротких через интервалы не более 2 минут", meaning: "NUC, RAM, CBD, парусное, рыболовное или буксирующее судно", context: "Правило 35(c); учитывайте дополнительные сигналы буксируемого состава." };
+  }
+  if (profile.kind === "wig-craft" && !profile.wigOnSurface) {
+    return null;
+  }
+  if (!profile.underway) return null;
+  return profile.makingWay
+    ? { rule: 35, pattern: "1 продолжительный через интервалы не более 2 минут", meaning: "Механическое судно на ходу и с ходом относительно воды", context: "Правило 35(a)." }
+    : { rule: 35, pattern: "2 продолжительных с интервалом около 2 секунд через интервалы не более 2 минут", meaning: "Механическое судно на ходу, но без хода относительно воды", context: "Правило 35(b)." };
+}
+
 export function getSoundSignals(rule?: number): SoundSignalGuidance[] {
   return rule === undefined ? SOUND_SIGNALS : SOUND_SIGNALS.filter((signal) => signal.rule === rule);
 }
