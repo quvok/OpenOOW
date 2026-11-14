@@ -1,4 +1,5 @@
 import type { VesselState } from "./navigation";
+import type { RadarMeasurement } from "./radarMeasurements";
 
 export interface RadarTrackSample {
   /** Target position relative to own ship at the sample time, in NM. */
@@ -52,6 +53,47 @@ export function recordRadarTracks(
       timeSeconds,
     };
     nextHistory[target.id] = [...previous, sample].slice(-maxSamples);
+  }
+  return nextHistory;
+}
+
+/** Creates a history from the first measured radar sweep, not scenario truth. */
+export function createRadarMeasurementTrackHistory(
+  measurements: readonly RadarMeasurement[],
+  ownPosition: { xNm: number; yNm: number },
+): RadarTrackHistory {
+  return Object.fromEntries(measurements.map((measurement) => [measurement.id, [{
+    xNm: measurement.xNm - ownPosition.xNm,
+    yNm: measurement.yNm - ownPosition.yNm,
+    timeSeconds: measurement.timeSeconds,
+  }]]));
+}
+
+/**
+ * Appends only detected radar echoes. Missing contacts do not receive a
+ * fabricated position; stored coordinates remain relative to own ship at
+ * the instant of the scan.
+ */
+export function recordRadarMeasurementTracks(
+  history: RadarTrackHistory,
+  measurements: readonly RadarMeasurement[],
+  maxSamples = 240,
+  ownPosition: { xNm: number; yNm: number } = { xNm: 0, yNm: 0 },
+): RadarTrackHistory {
+  if (!Number.isInteger(maxSamples) || maxSamples < 2) {
+    throw new RangeError("maxSamples must be an integer >= 2.");
+  }
+  let nextHistory = history;
+  for (const measurement of measurements) {
+    const previous = history[measurement.id] ?? [];
+    const last = previous[previous.length - 1];
+    if (last && measurement.timeSeconds <= last.timeSeconds + 1e-9) continue;
+    if (nextHistory === history) nextHistory = { ...history };
+    nextHistory[measurement.id] = [...previous, {
+      xNm: measurement.xNm - ownPosition.xNm,
+      yNm: measurement.yNm - ownPosition.yNm,
+      timeSeconds: measurement.timeSeconds,
+    }].slice(-maxSamples);
   }
   return nextHistory;
 }
