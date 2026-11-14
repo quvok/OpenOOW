@@ -1,4 +1,87 @@
-import{useState}from"react";import{Ship,Radar,Compass,Anchor,Activity,Gauge,Waves}from"lucide-react";import{calculateCpa,type VesselState}from"../core/navigation";
-const own:VesselState={id:"own",xNm:0,yNm:0,courseDeg:0,speedKn:12};const targets:VesselState[]=[{id:"T01",xNm:2.8,yNm:4.2,courseDeg:210,speedKn:9},{id:"T02",xNm:-1.5,yNm:6.1,courseDeg:180,speedKn:11},{id:"T03",xNm:4.4,yNm:-1.8,courseDeg:45,speedKn:7}];
-export default function App(){const[id,setId]=useState("T01"),[range,setRange]=useState(6);const t=targets.find(x=>x.id===id)!;const c=calculateCpa(own,t);return <main className="layout"><aside><div className="brand"><Ship/> <b>OpenOOW</b></div><small>ТРЕНАЖЁР</small><p className="active"><Radar/> Радар / ARPA</p><p><Compass/> Судовождение</p><p><Anchor/> Швартовка</p><p><Waves/> Среда</p><small>ОБУЧЕНИЕ</small><p><Activity/> Сценарии</p><p><Gauge/> Экзамен</p><footer>SIMULATION CORE · 0.1.0</footer></aside><section><header><div><small>НАВИГАЦИОННЫЙ ТРЕНАЖЁР</small><h1>Радар и ARPA</h1></div><span>● УЧЕБНЫЙ РЕЖИМ</span></header><div className="grid"><article className="panel radar"><h3>RADAR PPI <small>North Up · Relative Motion</small></h3><svg viewBox="0 0 500 500"><circle cx="250" cy="250" r="240" className="bg"/>{[60,120,180,240].map(n=><circle key={n} cx="250" cy="250" r={n} className="ring"/>)}<path d="M250 10V490M10 250H490" className="cross"/>{targets.map(x=><g key={x.id} onClick={()=>setId(x.id)}><circle cx={250+x.xNm*500/(2*range)} cy={250-x.yNm*500/(2*range)} r={x.id===id?9:6} className={x.id===id?"selected":"target"}/><text x={260+x.xNm*500/(2*range)} y={240-x.yNm*500/(2*range)}>{x.id}</text></g>)}<path d="M250 230l-9 30 9-5 9 5z" className="own"/></svg><label>ДАЛЬНОСТЬ <select value={range} onChange={e=>setRange(Number(e.target.value))}><option>3</option><option>6</option><option>12</option><option>24</option></select> NM</label></article><div className="stack"><article className="panel"><h3>OWN SHIP</h3><div className="metrics"><Metric label="КУРС" value="000° T"/><Metric label="СКОРОСТЬ" value="12.0 kn"/><Metric label="ROT" value="0.0°/min"/><Metric label="ПОЗИЦИЯ" value="0 / 0 NM"/></div></article><article className="panel"><h3>ARPA TARGET · {id}</h3><nav>{targets.map(x=><button className={id===x.id?"chosen":""} onClick={()=>setId(x.id)}>{x.id}</button>)}</nav><div className="metrics"><Metric label="ПЕЛЕНГ" value={c?c.bearingDeg.toFixed(0)+"°":"—"}/><Metric label="ДИСТАНЦИЯ" value={c?c.rangeNm.toFixed(1)+" NM":"—"}/><Metric label="CPA" value={c?c.dcpaNm.toFixed(2)+" NM":"—"}/><Metric label="TCPA" value={c?c.tcpaMin.toFixed(0)+" min":"—"}/></div><p className="note">Демонстрационная геометрическая модель. Это не обработка радиолокационных измерений.</p></article><article className="panel"><h3>ENVIRONMENT</h3><p>Ветер — · Течение — · Видимость —</p></article></div></div><footer className="disclaimer">OPEN SOURCE MARITIME TRAINING · НЕ СЕРТИФИЦИРОВАННЫЙ ТРЕНАЖЁР · НЕ ДЛЯ НАВИГАЦИИ</footer></section></main>}
-function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><b>{value}</b></div>}
+import { useEffect, useState } from "react";
+import { Anchor, Gauge, RotateCcw, Ship, Waves } from "lucide-react";
+import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
+
+const STEP_SECONDS = 0.1;
+const RADAR_RANGE_NM = 1.5;
+function formatTime(seconds: number) {
+  const total = Math.floor(seconds);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return pad(Math.floor(total / 3600)) + ":" + pad(Math.floor((total % 3600) / 60)) + ":" + pad(total % 60);
+}
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="metric"><span>{label}</span><b>{value}</b></div>;
+}
+export default function App() {
+  const [ship, setShip] = useState<ShipDynamicsState>(INITIAL_SHIP_STATE);
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setInterval(() => setShip((current) => stepShip(current, STEP_SECONDS)), STEP_SECONDS * 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
+  const reset = () => { setRunning(false); setShip(INITIAL_SHIP_STATE); };
+  const x = 250 + (ship.eastNm / RADAR_RANGE_NM) * 220;
+  const y = 250 - (ship.northNm / RADAR_RANGE_NM) * 220;
+  return <main className="app-shell">
+    <aside className="sidebar">
+      <div className="brand"><Ship size={24}/><span>OpenOOW</span></div>
+      <div className="side-label">ТРЕНАЖЁР</div>
+      <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
+      <div className="side-link"><Anchor size={17}/>Маневрирование</div>
+      <div className="side-link"><Waves size={17}/>Внешняя среда</div>
+      <div className="sidebar-foot">SIM CORE · 0.2.0</div>
+    </aside>
+    <section className="workspace">
+      <header className="topbar">
+        <div><div className="eyebrow">OPENOOW / ПРОТОТИП</div><h1>Динамика собственного судна</h1></div>
+        <div className={running ? "status live" : "status"}><i/>{running ? "СИМУЛЯЦИЯ ЗАПУЩЕНА" : "ПАУЗА"}</div>
+      </header>
+      <div className="main-grid">
+        <section className="panel radar-panel">
+          <div className="panel-heading"><div><span className="eyebrow">ВИД СВЕРХУ</span><h2>Положение судна</h2></div><span className="unit">NORTH UP · 1.5 NM</span></div>
+          <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Положение и курс собственного судна">
+            <circle cx="250" cy="250" r="235" className="radar-bg"/>
+            {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)}
+            <path d="M250 15V485 M15 250H485" className="radar-cross"/>
+            <path d={"M250 250 L" + x + " " + y} className="track-line"/>
+            <g transform={"translate(" + x + " " + y + ") rotate(" + ship.headingDeg + ")"}><path d="M0 -18 L10 15 L0 9 L-10 15 Z" className="own-ship"/></g>
+            <text x="260" y="28">N</text><text x="260" y="270">OWN SHIP</text>
+          </svg>
+          <div className="radar-legend"><span><i className="dot own-dot"/>Собственное судно</span><span>Шкала: ±1.5 NM</span></div>
+        </section>
+        <div className="control-column">
+          <section className="panel">
+            <div className="panel-heading"><div><span className="eyebrow">МОСТИК</span><h2>Органы управления</h2></div></div>
+            <div className="control-block">
+              <div className="control-title"><label htmlFor="throttle">Телеграф двигателя</label><strong>{Math.round(ship.throttlePercent)}%</strong></div>
+              <input id="throttle" type="range" min="0" max="100" step="1" value={ship.throttlePercent} onChange={(e)=>setShip(s=>({...s,throttlePercent:Number(e.target.value)}))}/>
+              <div className="range-labels"><span>STOP</span><span>FULL AHEAD</span></div>
+            </div>
+            <div className="control-block">
+              <div className="control-title"><label htmlFor="rudder">Угол руля</label><strong>{ship.rudderDeg.toFixed(0)}°</strong></div>
+              <input id="rudder" type="range" min="-35" max="35" step="1" value={ship.rudderDeg} onChange={(e)=>setShip(s=>({...s,rudderDeg:Number(e.target.value)}))}/>
+              <div className="range-labels"><span>35° ЛЕВО</span><span>35° ПРАВО</span></div>
+            </div>
+            <div className="action-row">
+              <button className="primary" onClick={()=>setRunning(v=>!v)}>{running ? "Пауза" : "Пуск"}</button>
+              <button className="secondary" onClick={reset}><RotateCcw size={15}/>Сброс</button>
+            </div>
+          </section>
+          <section className="panel">
+            <div className="panel-heading"><div><span className="eyebrow">ТЕКУЩИЕ ДАННЫЕ</span><h2>Параметры движения</h2></div></div>
+            <div className="metrics-grid">
+              <Metric label="СКОРОСТЬ" value={ship.speedKn.toFixed(2) + " kn"}/>
+              <Metric label="КУРС" value={ship.headingDeg.toFixed(1) + "° T"}/>
+              <Metric label="ROT" value={(ship.yawRateDegPerSec*60).toFixed(1) + "°/min"}/>
+              <Metric label="ВРЕМЯ" value={formatTime(ship.elapsedSeconds)}/>
+              <Metric label="EAST" value={ship.eastNm.toFixed(3) + " NM"}/>
+              <Metric label="NORTH" value={ship.northNm.toFixed(3) + " NM"}/>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div className="notice"><b>О модели:</b> версия 0.2 использует упрощённую кинематическую модель с инерцией разгона и запаздыванием реакции рыскания на руль. Это не полноценная гидродинамика и не навигационный прибор.</div>
+    </section>
+  </main>;
+}
