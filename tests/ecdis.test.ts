@@ -164,16 +164,19 @@ describe("ECDIS GeoJSON chart ingestion", () => {
           geometry: { type: "LineString", coordinates: [geo(-2,0), geo(2,0)] } },
         { type: "Feature", id: "sounding-1", properties: { layer: "SOUNDG", VALSOU: 8.4 },
           geometry: { type: "Point", coordinates: geo(0.2,0.2) } },
+        { type: "Feature", id: "sounding-3d", properties: { layer: "SOUNDG" },
+          geometry: { type: "Point", coordinates: [...geo(0.3,0.3), 12.6] } },
         { type: "Feature", id: "rock-1", properties: { layer: "UWTROC", name: "Rock" },
           geometry: { type: "Point", coordinates: geo(0.5,0.5) } },
       ],
     };
     const chart = importGeoJsonChart(document, origin, "test chart");
-    expect(chart.featureCount).toBe(5);
+    expect(chart.featureCount).toBe(6);
     expect(chart.areas.map((area) => area.kind)).toEqual(["charted", "land"]);
     expect(chart.areas[0].depthM).toBe(24);
     expect(chart.contours[0].depthM).toBe(10);
     expect(chart.soundings[0].depthM).toBe(8.4);
+    expect(chart.soundings[1].depthM).toBe(12.6);
     expect(chart.hazards[0].name).toBe("Rock");
     expect(chart.soundings[0].position.eastNm).toBeCloseTo(0.2, 4);
   });
