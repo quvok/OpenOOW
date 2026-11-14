@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VesselState } from "../src/core/navigation";
-import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks } from "../src/core/arpa";
+import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, type ArpaTrackSet } from "../src/core/arpa";
 
 const target: VesselState = { id: "T1", xNm: 0, yNm: 2, courseDeg: 180, speedKn: 5 };
 const own: VesselState = { id: "OWN", xNm: 0, yNm: 0, courseDeg: 0, speedKn: 10 };
@@ -14,7 +14,7 @@ describe("ARPA acquisition and tracking", () => {
   });
 
   it("estimates a southbound target from successive positions, not declared course/speed", () => {
-    let tracks = { T1: acquireArpaTarget(target, 0) };
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ ...target, yNm: 2 - 5 / 3600 * 5 }], 5);
     expect(tracks.T1.status).toBe("tracking");
     expect(tracks.T1.estimatedCourseDeg).toBeCloseTo(180);
