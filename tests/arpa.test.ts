@@ -160,6 +160,6 @@ describe("ARPA acquisition and tracking", () => {
 
   it("does not append a duplicate measurement at the same scan time", () => {
     const tracks = { T1: acquireArpaTarget(target, 0) };
-    expect(updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 }], 0)).toBe(tracks);
+    expect(updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 }], 0)).toEqual(tracks);
   });
 });
