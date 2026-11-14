@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
+import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
@@ -39,7 +40,9 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState<EncounterScenario>(ENCOUNTER_SCENARIOS[0]);
   const [ship, setShip] = useState<ShipDynamicsState>(() => createScenarioShipState(ENCOUNTER_SCENARIOS[0]));
   const [running, setRunning] = useState(false);
+  const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const shipRef = useRef<ShipDynamicsState>(ship);
+  const targetsRef = useRef<VesselState[]>(targets);
   const accumulatorRef = useRef(0);
 
   const updateShip = (update: (current: ShipDynamicsState) => ShipDynamicsState) => {
@@ -68,10 +71,21 @@ export default function App() {
           STEP_SECONDS,
           stepShip,
         );
+        const trafficResult = advanceFixedSteps(
+          targetsRef.current,
+          elapsedSeconds,
+          accumulatorRef.current,
+          STEP_SECONDS,
+          (currentTargets, dtSeconds) => currentTargets.map((target) => advanceVessel(target, dtSeconds)),
+        );
 
         shipRef.current = result.state;
+        targetsRef.current = trafficResult.state;
         accumulatorRef.current = result.accumulatorSeconds;
-        if (result.stepsExecuted > 0) setShip(result.state);
+        if (result.stepsExecuted > 0) {
+          setShip(result.state);
+          setTargets(trafficResult.state);
+        }
       }
 
       frameId = window.requestAnimationFrame(frame);
@@ -90,6 +104,9 @@ export default function App() {
     shipRef.current = nextShip;
     setShip(nextShip);
     setActiveScenario(scenario);
+    const nextTargets = scenario.targets.map((target) => ({ ...target }));
+    targetsRef.current = nextTargets;
+    setTargets(nextTargets);
   };
 
   const reset = () => {
@@ -98,11 +115,15 @@ export default function App() {
     const resetShip = createScenarioShipState(activeScenario);
     shipRef.current = resetShip;
     setShip(resetShip);
+    const resetTargets = activeScenario.targets.map((target) => ({ ...target }));
+    targetsRef.current = resetTargets;
+    setTargets(resetTargets);
   };
 
   const x = 250 + (ship.eastNm / RADAR_RANGE_NM) * 220;
   const y = 250 - (ship.northNm / RADAR_RANGE_NM) * 220;
-  const targetCpa = getScenarioTargetCpa(activeScenario);
+  const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
+  const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
 
   return <main className="app-shell">
     <aside className="sidebar">
@@ -146,7 +167,7 @@ export default function App() {
             }
             <path d="M250 15V485 M15 250H485" className="radar-cross"/>
             <path d={"M250 250 L" + x + " " + y} className="track-line"/>
-            {activeScenario.targets.map((target) => {
+            {targets.map((target) => {
               const tx = 250 + (target.xNm / RADAR_RANGE_NM) * 220;
               const ty = 250 - (target.yNm / RADAR_RANGE_NM) * 220;
               return <g key={target.id} transform={"translate(" + tx + " " + ty + ")"}>
@@ -192,17 +213,17 @@ export default function App() {
         </div>
       </div>
       <section className="panel cpa-panel">
-        <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ ПО ИСХОДНЫМ ДАННЫМ</span><h2>Оценка целей до начала манёвра</h2></div><Target size={18}/></div>
+        <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ В РЕАЛЬНОМ ВРЕМЕНИ</span><h2>Текущая оценка целей</h2></div><Target size={18}/></div>
         <div className="cpa-table-wrap"><table className="cpa-table"><thead><tr><th>Цель</th><th>Пеленг</th><th>Дистанция</th><th>TCPA</th><th>DCPA</th></tr></thead><tbody>
           {targetCpa.map(({target,cpa}) => <tr key={target.id}><td>{target.id}</td><td>{cpa ? cpa.bearingDeg.toFixed(1) + "°" : "—"}</td><td>{cpa ? cpa.rangeNm.toFixed(2) + " NM" : "—"}</td><td>{cpa ? formatMinutes(cpa.tcpaMin) : "—"}</td><td>{cpa ? cpa.dcpaNm.toFixed(2) + " NM" : "—"}</td></tr>)}
         </tbody></table></div>
-        <p className="cpa-note">CPA/TCPA рассчитаны по постоянным исходным курсам и скоростям до манёвра. Таблица не обновляет векторы цели и не является ARPA. После изменения курса или скорости собственного судна расчёт будет обновлён в следующих версиях.</p>
+        <p className="cpa-note">Позиции целей и собственного судна обновляются с фиксированным шагом 0,1 с. CPA/TCPA пересчитываются по текущим векторам при каждом кадре интерфейса. Это геометрический прогноз при сохранении текущих курсов и скоростей, а не ARPA-сопровождение и не прогноз с учётом будущих манёвров.</p>
       </section>
       <section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
       </section>
-      <div className="notice"><b>Ограничение учебной модели:</b> цели пока неподвижны относительно заданной схемы, а их CPA/TCPA показывают только исходный прогноз по постоянным векторам. Динамическое движение целей, ARPA-сопровождение и автоматическая оценка действий ещё не реализованы. Сценарии предназначены для тренировки распознавания ситуации, а не для реального судовождения.</div>
+      <div className="notice"><b>Ограничение учебной модели:</b> цели движутся по заданным постоянным курсам и скоростям. Их манёвры, ускорение, дрейф, ветер и течение пока не моделируются. Пересчёт CPA/TCPA не является полноценным ARPA и не оценивает автоматически правильность манёвра. Сценарии предназначены для обучения, а не для реального судовождения.</div>
     </section>
   </main>;
 }
