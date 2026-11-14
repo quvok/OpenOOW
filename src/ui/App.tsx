@@ -142,7 +142,7 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.6.1</div>
+      <div className="sidebar-foot">SIM CORE · 0.7.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
