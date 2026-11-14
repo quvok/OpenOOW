@@ -58,3 +58,133 @@
 .arpa-swap{color:#718f9f;font-size:9px;white-space:nowrap}
 .arpa-swap.active{color:#ffc36d;font-weight:700}
 @media(max-width:700px){.vector-mode-control{align-items:flex-start;flex-direction:column}.vector-length-control{width:100%;justify-content:space-between}.vector-length-control input{flex:1}.trial-controls{align-items:stretch;flex-direction:column}.trial-controls>div{min-width:0}.trial-controls label{flex-direction:row;justify-content:space-between;align-items:center}.trial-controls input{width:100px}}
+
+
+/* Transas Navi-Sailor inspired bridge radar presentation */
+:root{font-family:Arial,Helvetica,sans-serif;color:#d0d5cf;background:#080b09}
+body{min-width:320px;background:#080b09}
+.app-shell{display:block;min-height:100vh;background:#080b09;color:#d0d5cf}
+.sidebar{display:none}
+.workspace{width:100%;max-width:none;margin:0;padding:0 12px 14px;background:#0b0e0c}
+.transas-topbar{height:54px;margin:0 -12px 0;padding:0 18px;background:#171b19;border-bottom:1px solid #353c36;display:flex;gap:20px}
+.equipment-brand{display:flex;align-items:center;gap:9px;min-width:190px;color:#e0e4dc}
+.equipment-mark{width:29px;height:29px;border:1px solid #8e9b8d;border-radius:50%;display:grid;place-items:center;font:700 17px Arial;color:#a9b6a2}
+.equipment-brand b{display:block;font:700 12px Arial;letter-spacing:1.4px}
+.equipment-brand small{display:block;margin-top:3px;color:#8a9489;font:8px 'DM Mono',monospace;letter-spacing:1px}
+.equipment-title{display:flex;align-items:center;gap:12px;flex:1}
+.equipment-title strong{font:700 12px 'DM Mono',monospace;color:#b9c6b0;letter-spacing:1.4px}
+.equipment-title span{font:11px 'DM Mono',monospace;color:#8e9a8e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.transas-topbar .status{font:10px 'DM Mono',monospace;color:#aab3a7;letter-spacing:1px}
+.transas-topbar .status.live{color:#a5d47e}
+.transas-topbar .status i{border-radius:0;width:7px;height:7px;background:#687164}
+.transas-topbar .status.live i{background:#a5d47e;box-shadow:0 0 7px #a5d47e}
+.instrument-strip{display:flex;align-items:stretch;gap:0;min-height:43px;margin:0 -12px 10px;background:#101411;border-bottom:1px solid #343d34;border-top:1px solid #252c26;overflow-x:auto}
+.instrument-strip>span{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:95px;padding:5px 14px;border-right:1px solid #293029}
+.instrument-strip small{font:8px 'DM Mono',monospace;color:#7f8c7b;letter-spacing:1px}
+.instrument-strip b{font:12px 'DM Mono',monospace;color:#c2d0b7;font-weight:500;white-space:nowrap}
+.panel{background:#111612;border:1px solid #343d34;border-radius:2px;padding:11px;box-shadow:none}
+.scenario-picker{margin-bottom:10px;padding:9px 12px}
+.scenario-picker-top{align-items:center}
+.scenario-picker .eyebrow,.eyebrow{color:#82917d;letter-spacing:1.1px}
+.scenario-picker h2,.panel h2{font:600 12px 'DM Mono',monospace;color:#c1cbbd;letter-spacing:.4px}
+.scenario-select-row{margin-top:7px}
+.scenario-select-row select{border-radius:2px;background:#090d0a;border:1px solid #465044;color:#c7d1c0;font:11px 'DM Mono',monospace}
+.scenario-select-row button,.primary,.secondary{border-radius:2px;font:10px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.4px}
+.primary{background:#34482b;border:1px solid #687d55;color:#d9e5cd}
+.secondary{background:#202820;border:1px solid #465044;color:#c0c9b9}
+.scenario-description{margin-top:8px;padding-top:7px;border-top:1px solid #293229;color:#929e8c;font:10px/1.45 'DM Mono',monospace}
+.scenario-description>b{font:600 11px 'DM Mono',monospace;color:#d0d8c9}
+.scenario-description>span{color:#b4c38c;font:9px 'DM Mono',monospace}
+.scenario-description p{margin:4px 0}
+.scenario-facts{margin-top:6px;color:#a2ad96;font:9px 'DM Mono',monospace}
+.main-grid{grid-template-columns:minmax(0,1.65fr) minmax(270px,.62fr);gap:10px;align-items:stretch}
+.radar-panel{background:#080d09;border:1px solid #465345;border-radius:2px;padding:9px 12px;min-height:0}
+.radar-heading{padding:2px 4px 8px;border-bottom:1px solid #303a2e}
+.radar-heading .eyebrow{color:#84927a}
+.radar-heading h2{margin-top:3px;color:#c4ceb8;font:11px 'DM Mono',monospace}
+.radar-heading .unit{color:#82917b;font:8px 'DM Mono',monospace}
+.vector-mode-control{margin:7px 0 0;color:#8f9c85;font:8px 'DM Mono',monospace}
+.vector-mode-control button{border-radius:1px;background:#111811;border-color:#45513e;color:#aeb9a3}
+.vector-mode-control button.mode-active{background:#34452b;border-color:#82956a;color:#e0e8d5}
+.vector-length-control strong{color:#c3d0b6}
+.radar-view{width:min(100%,min(78vh,780px));max-height:calc(100vh - 245px);margin:2px auto;flex:1;min-height:320px}
+.radar-bg{fill:#030905;stroke:#68755d;stroke-width:1.1}
+.radar-ring{stroke:#42523c;stroke-width:.9;opacity:.95}
+.radar-cross{stroke:#35432f;stroke-width:.8;stroke-dasharray:none;opacity:.8}
+.radar-view text{fill:#a2b392;font:9px 'DM Mono',monospace}
+.bearing-mark line{stroke:#8d9b7e;stroke-width:1}
+.bearing-mark text{fill:#b6c5a2;font:8px 'DM Mono',monospace}
+.range-labels text{fill:#7f9073;font:7px 'DM Mono',monospace}
+.vrm-ring{stroke:#b2b9a0;stroke-width:1;stroke-dasharray:4 3;opacity:.8}
+.ebl-line{stroke:#d2c16d;stroke-width:1.2;stroke-dasharray:7 3;filter:none}
+.own-ship{fill:#d5dfc5;stroke:#f0f4e7;stroke-width:1.2}
+.target-echo{fill:#d7dca2;stroke:#f1f4d0;stroke-width:1.2}
+.target-echo.selected{fill:#fff3a0;stroke:#fffbd8}
+.target-vector{stroke:#d2d99a;stroke-width:1.4}
+.target-vector-head{stroke:#d2d99a;stroke-width:1.4}
+.target-course-label{fill:#a9b98a!important}
+.target-trail{stroke:#9fae7d;stroke-width:1.2;opacity:.55}
+.radar-legend{justify-content:center;gap:22px;padding:5px 0;border-top:1px solid #273126;border-bottom:1px solid #273126;color:#8b9a80;font:8px 'DM Mono',monospace}
+.radar-legend .dot{width:6px;height:6px;border-radius:0}
+.own-dot{background:#d5dfc5}.target-dot{background:#d7dca2}.trail-dot{background:#9fae7d}
+.radar-tools{margin-top:7px;padding-top:7px;border-color:#2b3529;gap:12px}
+.radar-tool .control-title{font:9px 'DM Mono',monospace;color:#a7b49a}
+.radar-tool .control-title strong{font:10px 'DM Mono',monospace;color:#d0d9c3}
+input[type=range]{accent-color:#a6b58b}
+.radar-tool input[type=range]{margin:7px 0 3px}
+.range-labels{color:#75836d;font:8px 'DM Mono',monospace}
+.radar-selection-panel{border-color:#2b3529;margin-top:9px;padding-top:8px}
+.radar-selection-panel .panel-heading h2{font-size:10px}
+.measurement-readouts{gap:8px;margin-top:8px}
+.metric{gap:3px}
+.metric span{font:8px 'DM Mono',monospace;color:#82917b}
+.metric b{font:12px 'DM Mono',monospace;color:#d0dac4}
+.selection-actions{margin-top:8px;color:#9ba88f;font:9px 'DM Mono',monospace}
+.control-column{gap:10px}
+.control-column>.panel{background:#151a15;border-color:#394337;border-radius:2px}
+.control-block{margin-top:13px}
+.control-title{font:10px 'DM Mono',monospace;color:#aab59e}
+.control-title strong{font:12px 'DM Mono',monospace;color:#d2ddc4}
+.control-block input[type=range]{margin:9px 0 4px}
+.range-labels{color:#7f8d76}
+.actual-rudder{color:#9aa68e;font:9px 'DM Mono',monospace}
+.action-row{margin-top:14px}
+.metrics-grid{gap:12px 8px;margin-top:14px}
+.metric b{font-size:14px}
+.instrument-footer{display:flex;align-items:center;gap:17px;min-height:28px;padding:4px 10px;margin:0 0 10px;background:#151a15;border:1px solid #333c31;color:#8e9b83;font:8px 'DM Mono',monospace;letter-spacing:.6px}
+.tx-indicator{color:#b7a16c}.tx-indicator.active{color:#a5d47e}
+.footer-spacer{flex:1}
+.cpa-panel,.arpa-panel,.debrief-panel{margin-bottom:10px}
+.cpa-panel,.arpa-panel,.debrief-panel{background:#121712;border-color:#343d34;border-radius:2px}
+.cpa-table{font:9px 'DM Mono',monospace}
+.cpa-table th{color:#84927b;border-color:#364032;font-size:8px}
+.cpa-table td{color:#c4ceba;border-color:#293329;padding:8px}
+.cpa-note,.debrief-panel ul{color:#87947d;font:9px/1.5 'DM Mono',monospace}
+.arpa-alert-settings,.trial-controls{border-radius:2px;background:#0b100b;border-color:#343f30}
+.arpa-alert-settings label,.trial-controls label{color:#a4b096;font:9px 'DM Mono',monospace}
+.arpa-alert-settings input,.trial-controls input{border-radius:1px;background:#050805;border-color:#46513f;color:#d3dcc8}
+.arpa-table{min-width:1080px}
+.notice{border-radius:2px;background:#111611;border-color:#353e32;color:#8b9882;font:9px/1.5 'DM Mono',monospace}
+@media(max-width:900px){
+  .workspace{padding:0 7px 10px}
+  .main-grid{grid-template-columns:minmax(0,1fr)}
+  .radar-view{width:min(100%,min(72vh,680px));max-height:none;min-height:300px}
+  .control-column{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+  .transas-topbar{padding:0 9px;height:48px;gap:8px}
+  .equipment-brand{min-width:118px;gap:6px}
+  .equipment-brand small{font-size:6px}
+  .equipment-mark{width:24px;height:24px}
+  .equipment-title{display:none}
+  .instrument-strip>span{min-width:78px;padding:5px 9px}
+  .scenario-picker{padding:8px}
+  .main-grid{grid-template-columns:minmax(0,1fr)}
+  .radar-view{width:100%;min-height:280px;max-height:none}
+  .vector-mode-control{gap:7px}
+  .vector-mode-control>div{width:auto}
+  .vector-mode-control button{flex:0 0 auto}
+  .control-column{display:flex}
+  .instrument-footer{gap:10px;overflow-x:auto;white-space:nowrap}
+  .cpa-table{min-width:430px}
+}
