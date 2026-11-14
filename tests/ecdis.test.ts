@@ -46,7 +46,7 @@ describe("ECDIS navigation calculations", () => {
       { eastNm: 0, northNm: 0 }, { eastNm: 2, northNm: 0 }, { eastNm: 2, northNm: 2 }, { eastNm: 0, northNm: 2 },
     ] }];
     expect(chartedDepthAt({ eastNm: 1, northNm: 1 }, areas)).toBe(5);
-    expect(chartedDepthAt({ eastNm: 3, northNm: 1 }, areas)).toBe(40);
+    expect(chartedDepthAt({ eastNm: 3, northNm: 1 }, areas)).toBeNull();
   });
 
   it("detects shallow water and isolated dangers along the planned route", () => {
@@ -63,13 +63,22 @@ describe("ECDIS navigation calculations", () => {
     expect(result.safe).toBe(false);
   });
 
-  it("accepts a clear route through charted safe water", () => {
-    const result = assessRoute([
+  it("accepts a clear route only when chart depth coverage exists", () => {
+    const route = [
       { id: "a", name: "A", eastNm: 0, northNm: -2 },
       { id: "b", name: "B", eastNm: 2, northNm: -2 },
-    ], [], [], 10);
+    ];
+    const uncovered = assessRoute(route, [], [], 10);
+    expect(uncovered.safe).toBe(false);
+    expect(uncovered.unchartedIntersections.length).toBeGreaterThan(0);
+    const charted = [{ id: "c", name: "charted water", kind: "charted" as const, depthM: 40, polygon: [
+      { eastNm: -1, northNm: -3 }, { eastNm: 3, northNm: -3 },
+      { eastNm: 3, northNm: -1 }, { eastNm: -1, northNm: -1 },
+    ] }];
+    const result = assessRoute(route, charted, [], 10);
     expect(result.safe).toBe(true);
     expect(result.warnings).toHaveLength(0);
+    expect(result.minimumChartedDepthM).toBe(40);
   });
 
   it("detects land intersections", () => {
