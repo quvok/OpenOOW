@@ -3,6 +3,7 @@ import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
+import { createRadarTrackHistory, recordRadarTracks } from "../core/radarTracks";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
@@ -48,8 +49,10 @@ export default function App() {
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
+  const [tracks, setTracks] = useState(() => createRadarTrackHistory(ENCOUNTER_SCENARIOS[0].targets));
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
+  const tracksRef = useRef(tracks);
   const accumulatorRef = useRef(0);
 
   const updateShip = (update: (current: ShipDynamicsState) => ShipDynamicsState) => {
@@ -74,22 +77,29 @@ export default function App() {
         // Advance own ship and all traffic in one shared fixed-step clock.
         // This prevents the two sets of vessels from ever accumulating different time.
         const result = advanceFixedSteps(
-          { ownShip: shipRef.current, targets: targetsRef.current },
+          { ownShip: shipRef.current, targets: targetsRef.current, tracks: tracksRef.current },
           elapsedSeconds,
           accumulatorRef.current,
           STEP_SECONDS,
-          (current, dtSeconds) => ({
-            ownShip: stepShip(current.ownShip, dtSeconds),
-            targets: current.targets.map((target) => advanceVessel(target, dtSeconds)),
-          }),
+          (current, dtSeconds) => {
+            const nextOwnShip = stepShip(current.ownShip, dtSeconds);
+            const nextTargets = current.targets.map((target) => advanceVessel(target, dtSeconds));
+            return {
+              ownShip: nextOwnShip,
+              targets: nextTargets,
+              tracks: recordRadarTracks(current.tracks, nextTargets, nextOwnShip.elapsedSeconds),
+            };
+          },
         );
 
         shipRef.current = result.state.ownShip;
         targetsRef.current = result.state.targets;
+        tracksRef.current = result.state.tracks;
         accumulatorRef.current = result.accumulatorSeconds;
         if (result.stepsExecuted > 0) {
           setShip(result.state.ownShip);
           setTargets(result.state.targets);
+          setTracks(result.state.tracks);
         }
       }
 
@@ -112,6 +122,9 @@ export default function App() {
     const nextTargets = scenario.targets.map((target) => ({ ...target }));
     targetsRef.current = nextTargets;
     setTargets(nextTargets);
+    const nextTracks = createRadarTrackHistory(nextTargets);
+    tracksRef.current = nextTracks;
+    setTracks(nextTracks);
   };
 
   const reset = () => {
@@ -123,6 +136,9 @@ export default function App() {
     const resetTargets = activeScenario.targets.map((target) => ({ ...target }));
     targetsRef.current = resetTargets;
     setTargets(resetTargets);
+    const resetTracks = createRadarTrackHistory(resetTargets);
+    tracksRef.current = resetTracks;
+    setTracks(resetTracks);
   };
 
   // North-up PPI: own ship remains at the display centre; contacts are plotted relative to it.
@@ -182,6 +198,11 @@ export default function App() {
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
             {targets.map((target) => {
               const point = projectRelativePosition(ownVessel, target, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
+              const history = tracks[target.id] ?? [];
+              const trailPoints = [...history, { xNm: target.xNm, yNm: target.yNm, timeSeconds: ship.elapsedSeconds }]
+                .map((sample) => projectRelativePosition(ownVessel, sample, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER))
+                .filter((sample) => Math.hypot(sample.x - RADAR_CENTER, sample.y - RADAR_CENTER) <= RADAR_RADIUS_PX);
+              const trailPath = trailPoints.map((sample) => sample.x.toFixed(1) + "," + sample.y.toFixed(1)).join(" ");
               const vector = motionVectorToRadar(ownVessel, target, vectorMode, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX);
               const vectorLength = Math.hypot(vector.dx, vector.dy);
               const unitX = vectorLength > 0 ? vector.dx / vectorLength : 0;
@@ -194,12 +215,15 @@ export default function App() {
                   " L" + vector.dx + " " + vector.dy +
                   " L" + (baseX + unitY * wing) + " " + (baseY - unitX * wing)
                 : "";
-              return <g key={target.id} transform={"translate(" + point.x + " " + point.y + ")"}>
+              return <g key={target.id}>
+                {trailPoints.length > 1 && <polyline points={trailPath} className="target-trail"/>}
+                <g transform={"translate(" + point.x + " " + point.y + ")"}>
                 <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>
                 {vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
                 <circle r="7" className="target-echo"/>
                 <text x="12" y="4">{target.id}</text>
                 <text x="12" y="17" className="target-course-label">{target.courseDeg.toFixed(0)}°T</text>
+                </g>
               </g>;
             })}
             <g transform={"translate(" + x + " " + y + ") rotate(" + ship.headingDeg + ")"}><path d="M0 -18 L10 15 L0 9 L-10 15 Z" className="own-ship"/></g>
