@@ -215,7 +215,7 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
 }
 
 function isPowerDriven(profile: ColregVesselProfile): boolean {
-  return profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
+  return (profile.kind === "wig-craft" && profile.wigOnSurface === true) || profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
     (profile.kind === "fishing" && !profile.engagedInFishing) ||
     (profile.kind === "sailing" && profile.underSailAndPower);
 }
@@ -237,6 +237,17 @@ function classifyRule18(
   own: ColregVesselProfile,
   target: ColregVesselProfile,
 ): { responsibility: ColregResponsibility; duty: string } {
+  const ownWigInFlight = own.kind === "wig-craft" && !own.wigOnSurface;
+  const targetWigInFlight = target.kind === "wig-craft" && !target.wigOnSurface;
+  if (ownWigInFlight && targetWigInFlight) {
+    return { responsibility: "undetermined", duty: "Оба WIG находятся в полёте у поверхности. Правило 18(f) требует каждому держаться в стороне от других судов; проверьте фактическую траекторию и специальные обстоятельства." };
+  }
+  if (ownWigInFlight) {
+    return { responsibility: "give-way", duty: "WIG при взлёте, посадке и полёте у поверхности должен держаться в стороне от всех других судов и не затруднять их движение (правило 18(f))." };
+  }
+  if (targetWigInFlight) {
+    return { responsibility: "stand-on", duty: "Цель — WIG в полёте у поверхности; она должна держаться в стороне от всех других судов и не затруднять их движение (правило 18(f)). Продолжайте наблюдение." };
+  }
   if (own.kind === "constrained-draught" && target.kind === "constrained-draught") {
     return { responsibility: "undetermined", duty: "Оба судна ограничены своей осадкой. Правило 18 не устанавливает приоритет между ними; каждое должно учитывать условия и не затруднять безопасное движение другого." };
   }
@@ -504,8 +515,8 @@ export function assessColregEncounter(
     });
   }
 
-  const ownLightKind = ownProfile.underSailAndPower ? "power-driven" : ownProfile.kind === "fishing" && !ownProfile.engagedInFishing ? "power-driven" : ownProfile.kind;
-  const targetLightKind = targetProfile.underSailAndPower ? "power-driven" : targetProfile.kind === "fishing" && !targetProfile.engagedInFishing ? "power-driven" : targetProfile.kind;
+  const ownLightKind = ownProfile.underSailAndPower || (ownProfile.kind === "wig-craft" && ownProfile.wigOnSurface) || (ownProfile.kind === "fishing" && !ownProfile.engagedInFishing) ? "power-driven" : ownProfile.kind;
+  const targetLightKind = targetProfile.underSailAndPower || (targetProfile.kind === "wig-craft" && targetProfile.wigOnSurface) || (targetProfile.kind === "fishing" && !targetProfile.engagedInFishing) ? "power-driven" : targetProfile.kind;
   const ownLightBase = getVesselLightGuidance(ownLightKind);
   const targetLightBase = getVesselLightGuidance(targetLightKind);
   const ownLightGuidance = { ...ownLightBase, lights: [...ownLightBase.lights], dayShapes: [...ownLightBase.dayShapes], notes: [...ownLightBase.notes] };
