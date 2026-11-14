@@ -386,6 +386,17 @@ export default function App() {
   }).filter((row): row is NonNullable<typeof row> => row !== null);
   const selectedInfoRow = arpaInfoRows.find((row) => row.track.targetId === targetInfoTab) ??
     arpaInfoRows.find((row) => row.track.associatedRadarId === selectedRadarTargetId) ?? null;
+  const targetInfoMetricRows = [
+    { label: "SRC", values: arpaInfoRows.map(({track}) => track.status === "tracking" ? "ARPA" : track.status === "lost" ? "LOST" : "ACQ") },
+    { label: "CPA", values: arpaInfoRows.map(({solution}) => solution.dcpaNm === null ? "—" : solution.dcpaNm.toFixed(2)) },
+    { label: "TCPA", values: arpaInfoRows.map(({solution}) => formatMinutes(solution.tcpaMin)) },
+    { label: "BRG", values: arpaInfoRows.map(({solution}) => solution.bearingDeg.toFixed(1)) },
+    { label: "RNG", values: arpaInfoRows.map(({solution}) => solution.rangeNm.toFixed(2)) },
+    { label: "COG", values: arpaInfoRows.map(({track}) => track.estimatedCourseDeg === null ? "—" : track.estimatedCourseDeg.toFixed(1)) },
+    { label: "SOG", values: arpaInfoRows.map(({track}) => track.estimatedSpeedKn === null ? "—" : track.estimatedSpeedKn.toFixed(1)) },
+    { label: "BCR", values: arpaInfoRows.map(({bow}) => bow.bcrNm === null ? "—" : bow.bcrNm.toFixed(2)) },
+    { label: "BCT", values: arpaInfoRows.map(({bow}) => formatMinutes(bow.bctMin)) },
+  ];
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
   return <main className="app-shell">
@@ -542,9 +553,9 @@ export default function App() {
               {arpaInfoRows.slice(0,6).map((row,index)=><button type="button" role="tab" aria-selected={targetInfoTab===row.track.targetId} className={targetInfoTab===row.track.targetId?"active":""} key={row.track.targetId} onClick={()=>{setTargetInfoTab(row.track.targetId);setSelectedRadarTargetId(row.track.associatedRadarId);}}>Target {index+1}</button>)}
               <button type="button" role="tab" aria-selected={targetInfoTab==="multiple"} className={targetInfoTab==="multiple"?"active":""} onClick={()=>setTargetInfoTab("multiple")}>Multiple</button>
             </div>
-            {targetInfoTab==="multiple" || !selectedInfoRow ? <div className="target-info-table-wrap"><table className="target-info-table"><thead><tr><th>TGT</th><th>SRC</th><th>CPA</th><th>TCPA</th><th>BRG</th><th>RNG</th><th>COG</th><th>SOG</th><th>BCR</th><th>BCT</th></tr></thead><tbody>
-              {arpaInfoRows.map(({track,solution,bow})=><tr key={track.targetId} className={selectedRadarTargetId===track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(track.associatedRadarId);setTargetInfoTab(track.targetId);}}><td>{track.targetId}</td><td>{track.status==="tracking"?"ARPA":track.status==="lost"?"LOST":"ACQ"}</td><td>{solution.dcpaNm===null?"—":solution.dcpaNm.toFixed(2)}</td><td>{formatMinutes(solution.tcpaMin)}</td><td>{solution.bearingDeg.toFixed(1)}</td><td>{solution.rangeNm.toFixed(2)}</td><td>{track.estimatedCourseDeg===null?"—":track.estimatedCourseDeg.toFixed(1)}</td><td>{track.estimatedSpeedKn===null?"—":track.estimatedSpeedKn.toFixed(1)}</td><td>{bow.bcrNm===null?"—":bow.bcrNm.toFixed(2)}</td><td>{formatMinutes(bow.bctMin)}</td></tr>)}
-              {arpaInfoRows.length===0&&<tr><td colSpan={10} className="target-info-empty">NO ARPA TARGETS · ACQUIRE A RADAR ECHO</td></tr>}
+            {targetInfoTab==="multiple" || !selectedInfoRow ? <div className="target-info-table-wrap"><table className="target-info-table target-info-multiple-table"><thead><tr><th>TGT</th>{arpaInfoRows.slice(0,5).map((row,index)=><th key={row.track.targetId}><button type="button" className={selectedRadarTargetId===row.track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(row.track.associatedRadarId);setTargetInfoTab(row.track.targetId);}}>Target {index+1}</button></th>)}</tr></thead><tbody>
+              {targetInfoMetricRows.map((metric)=><tr key={metric.label}><th>{metric.label}</th>{metric.values.slice(0,5).map((value,index)=><td key={arpaInfoRows[index].track.targetId} className={selectedRadarTargetId===arpaInfoRows[index].track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(arpaInfoRows[index].track.associatedRadarId);setTargetInfoTab(arpaInfoRows[index].track.targetId);}}>{value}</td>)}</tr>)}
+              {arpaInfoRows.length===0&&<tr><td colSpan={6} className="target-info-empty">NO ARPA TARGETS · ACQUIRE A RADAR ECHO</td></tr>}
             </tbody></table></div> : <div className="target-info-single"><div className="target-info-single-heading"><b>{selectedInfoRow.track.targetId}</b><span>{selectedInfoRow.track.status.toUpperCase()} · SRC ARPA</span><button type="button" onClick={()=>releaseTarget(selectedInfoRow.track.targetId)}>CANCEL</button></div>
               <div className="target-info-metrics">{[
                 ["CPA",selectedInfoRow.solution.dcpaNm===null?"—":selectedInfoRow.solution.dcpaNm.toFixed(2),"NM"],
