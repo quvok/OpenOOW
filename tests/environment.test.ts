@@ -23,8 +23,8 @@ describe("environment model", () => {
     const motion = calculateEnvironmentalMotion(0, 8, {
       ...CALM_ENVIRONMENT, windSpeedKn: 20, windFromDeg: 90,
     });
-    expect(motion.leewayDeg).toBeGreaterThan(0);
-    expect(motion.leewayDeg).toBeLessThanOrEqual(3);
+    expect(motion.leewayDeg).toBeLessThan(0);
+    expect(motion.leewayDeg).toBeGreaterThanOrEqual(-3);
   });
 
   it("reduces effective speed with increasing significant wave height", () => {
