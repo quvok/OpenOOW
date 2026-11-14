@@ -128,8 +128,8 @@ export default function EcdisModule({ ship, targets }: Props) {
     const points = route.map((point) => {
       const geo = toGeographicPosition(point, origin);
       return `    <rtept lat="${geo.latitudeDeg.toFixed(7)}" lon="${geo.longitudeDeg.toFixed(7)}"><name>${point.name}</name></rtept>`;
-    }).join("\\n");
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>\\n<gpx version="1.1" creator="OpenOOW" xmlns="http://www.topografix.com/GPX/1/1"><rte><name>OpenOOW route</name>\\n${points}\\n</rte></gpx>`;
+    }).join("\n");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="OpenOOW" xmlns="http://www.topografix.com/GPX/1/1"><rte><name>OpenOOW route</name>\n${points}\n</rte></gpx>`;
     const url = URL.createObjectURL(new Blob([xml], { type: "application/gpx+xml;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
