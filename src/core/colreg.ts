@@ -28,6 +28,7 @@ export interface ColregVesselProfile {
   engagedInFishing?: boolean;
   underSailAndPower?: boolean;
   wigOnSurface?: boolean;
+  seaplaneOnWater?: boolean;
 }
 
 export interface ColregEnvironment {
@@ -213,13 +214,14 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
 }
 
 function isPowerDriven(profile: ColregVesselProfile): boolean {
-  return (profile.kind === "wig-craft" && profile.wigOnSurface === true) || profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
+  return (profile.kind === "wig-craft" && profile.wigOnSurface === true) || (profile.kind === "seaplane" && profile.seaplaneOnWater === true) || profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
     (profile.kind === "fishing" && !profile.engagedInFishing) ||
     (profile.kind === "sailing" && profile.underSailAndPower);
 }
 
 function profileRank(profile: ColregVesselProfile): number | null {
   if (profile.kind === "wig-craft" && !profile.wigOnSurface) return -1;
+  if (profile.kind === "seaplane") return profile.seaplaneOnWater ? 0 : null;
   if (profile.kind === "nuc" || profile.kind === "ram") return 3;
   if (profile.kind === "fishing" && profile.engagedInFishing) return 2;
   if (profile.kind === "sailing" && !profile.underSailAndPower) return 1;
@@ -551,8 +553,8 @@ export function assessColregEncounter(
     });
   }
 
-  const ownLightKind = ownProfile.underSailAndPower || (ownProfile.kind === "wig-craft" && ownProfile.wigOnSurface) || (ownProfile.kind === "fishing" && !ownProfile.engagedInFishing) ? "power-driven" : ownProfile.kind;
-  const targetLightKind = targetProfile.underSailAndPower || (targetProfile.kind === "wig-craft" && targetProfile.wigOnSurface) || (targetProfile.kind === "fishing" && !targetProfile.engagedInFishing) ? "power-driven" : targetProfile.kind;
+  const ownLightKind = ownProfile.underSailAndPower || (ownProfile.kind === "wig-craft" && ownProfile.wigOnSurface) || (ownProfile.kind === "seaplane" && ownProfile.seaplaneOnWater) || (ownProfile.kind === "fishing" && !ownProfile.engagedInFishing) ? "power-driven" : ownProfile.kind;
+  const targetLightKind = targetProfile.underSailAndPower || (targetProfile.kind === "wig-craft" && targetProfile.wigOnSurface) || (targetProfile.kind === "seaplane" && targetProfile.seaplaneOnWater) || (targetProfile.kind === "fishing" && !targetProfile.engagedInFishing) ? "power-driven" : targetProfile.kind;
   const ownLightBase = getVesselLightGuidance(ownLightKind);
   const targetLightBase = getVesselLightGuidance(targetLightKind);
   const ownLightGuidance = { ...ownLightBase, lights: [...ownLightBase.lights], dayShapes: [...ownLightBase.dayShapes], notes: [...ownLightBase.notes] };
