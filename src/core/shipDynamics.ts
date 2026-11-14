@@ -5,6 +5,7 @@ export interface ShipDynamicsState {
   speedKn: number;
   yawRateDegPerSec: number;
   rudderDeg: number;
+  actualRudderDeg: number;
   throttlePercent: number;
   elapsedSeconds: number;
 }
@@ -14,7 +15,9 @@ export interface ShipModelParameters {
   maxAccelerationKnPerSec: number;
   maxDecelerationKnPerSec: number;
   maxRudderDeg: number;
+  maxRudderRateDegPerSec: number;
   maxTurnRateDegPerSec: number;
+  referenceSpeedKn: number;
   yawResponseSeconds: number;
 }
 
@@ -23,7 +26,9 @@ export const DEFAULT_SHIP_PARAMETERS: ShipModelParameters = {
   maxAccelerationKnPerSec: 0.025,
   maxDecelerationKnPerSec: 0.035,
   maxRudderDeg: 35,
+  maxRudderRateDegPerSec: 2.3,
   maxTurnRateDegPerSec: 0.35,
+  referenceSpeedKn: 8,
   yawResponseSeconds: 8,
 };
 
@@ -34,6 +39,7 @@ export const INITIAL_SHIP_STATE: ShipDynamicsState = {
   speedKn: 0,
   yawRateDegPerSec: 0,
   rudderDeg: 0,
+  actualRudderDeg: 0,
   throttlePercent: 0,
   elapsedSeconds: 0,
 };
@@ -41,6 +47,29 @@ export const INITIAL_SHIP_STATE: ShipDynamicsState = {
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
+const normalizeHeading = (heading: number) => ((heading % 360) + 360) % 360;
+
+function validateParameters(parameters: ShipModelParameters) {
+  const positive = [
+    parameters.maxSpeedKn,
+    parameters.maxAccelerationKnPerSec,
+    parameters.maxDecelerationKnPerSec,
+    parameters.maxRudderDeg,
+    parameters.maxRudderRateDegPerSec,
+    parameters.maxTurnRateDegPerSec,
+    parameters.referenceSpeedKn,
+    parameters.yawResponseSeconds,
+  ];
+  if (positive.some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new RangeError("All ship model parameters must be finite and greater than zero.");
+  }
+}
+
+/**
+ * Advances the simplified ship model by one integration step.
+ * Coordinates use a local tangent plane: east/north in nautical miles.
+ * Heading is true, clockwise from north; positive rudder means starboard.
+ */
 export function stepShip(
   state: ShipDynamicsState,
   dtSeconds: number,
@@ -49,6 +78,7 @@ export function stepShip(
   if (!Number.isFinite(dtSeconds) || dtSeconds <= 0 || dtSeconds > 1) {
     throw new RangeError("dtSeconds must be in the interval (0, 1].");
   }
+  validateParameters(parameters);
 
   const throttle = clamp(state.throttlePercent, 0, 100) / 100;
   const targetSpeed = throttle * parameters.maxSpeedKn;
@@ -68,14 +98,29 @@ export function stepShip(
     parameters.maxSpeedKn,
   );
 
-  const rudder = clamp(
+  // The steering gear cannot move the rudder instantaneously.
+  const rudderCommand = clamp(
     state.rudderDeg,
     -parameters.maxRudderDeg,
     parameters.maxRudderDeg,
   );
-  const speedFactor = Math.min(speedKn / 8, 1.4);
+  const rudderDelta = clamp(
+    rudderCommand - state.actualRudderDeg,
+    -parameters.maxRudderRateDegPerSec * dtSeconds,
+    parameters.maxRudderRateDegPerSec * dtSeconds,
+  );
+  const actualRudderDeg = clamp(
+    state.actualRudderDeg + rudderDelta,
+    -parameters.maxRudderDeg,
+    parameters.maxRudderDeg,
+  );
+
+  // Rudder effectiveness falls rapidly at low speed. This is a deliberately
+  // simple speed-squared approximation, not a validated hydrodynamic law.
+  const speedRatio = speedKn / parameters.referenceSpeedKn;
+  const speedFactor = Math.min(speedRatio * speedRatio, 1.5);
   const targetYawRate =
-    (rudder / parameters.maxRudderDeg) *
+    (actualRudderDeg / parameters.maxRudderDeg) *
     parameters.maxTurnRateDegPerSec *
     speedFactor;
   const yawRateDegPerSec =
@@ -84,9 +129,11 @@ export function stepShip(
       parameters.yawResponseSeconds) *
       dtSeconds;
 
-  const headingDeg =
-    (state.headingDeg + yawRateDegPerSec * dtSeconds + 360) % 360;
-  const headingRad = (headingDeg * Math.PI) / 180;
+  // Midpoint integration reduces the positional error during a turn.
+  const headingDelta = yawRateDegPerSec * dtSeconds;
+  const headingMid = normalizeHeading(state.headingDeg + headingDelta / 2);
+  const headingDeg = normalizeHeading(state.headingDeg + headingDelta);
+  const headingRad = (headingMid * Math.PI) / 180;
   const distanceNm = (speedKn * dtSeconds) / 3600;
 
   return {
@@ -96,6 +143,7 @@ export function stepShip(
     headingDeg,
     speedKn,
     yawRateDegPerSec,
+    actualRudderDeg,
     elapsedSeconds: state.elapsedSeconds + dtSeconds,
   };
 }
