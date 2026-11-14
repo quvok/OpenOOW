@@ -553,3 +553,28 @@ input[type=range]{accent-color:#a6b58b}
 .target-info-expanded-blocks button:hover,.target-info-expanded-blocks button.active{background:linear-gradient(#9aabb1,#53656d);color:#101a20}
 .target-information-panel>.panel{width:100%;min-width:0;margin:8px 0 0}
 @media(max-width:560px){.target-info-expanded-blocks{grid-template-columns:1fr 1fr}.target-info-expanded-blocks button{font-size:8px;padding:8px 6px}}
+
+
+/* v0.23.5 — ARPA target detail pages remain inside the Targets Information selector */
+.target-info-detail-panel{width:100%;min-width:0;margin:8px 0 0!important;padding:9px!important}
+.target-info-detail-panel .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.target-info-detail-panel .target-info-tabs{flex-wrap:nowrap;overflow-x:auto;max-width:100%;margin:6px 0 8px}
+.target-info-detail-panel .target-info-tabs button{white-space:nowrap}
+.target-info-detail-panel .target-info-table-wrap{overflow-x:auto;max-width:100%}
+.target-info-detail-panel .target-info-multiple-table{min-width:420px}
+.target-info-detail-panel .target-info-multiple-table td{padding:3px}
+.target-info-detail-panel .target-info-multiple-table td button{width:100%;min-height:25px;padding:4px 3px;border:1px solid #394950;background:#172229;color:#e3ecef;font:9px 'DM Mono',monospace;cursor:pointer}
+.target-info-detail-panel .target-info-multiple-table td button:hover{background:#465b64;color:#fff}
+.target-info-detail-panel .target-info-multiple-table th button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.target-info-detail-panel .target-info-single-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 2px;border-bottom:1px solid #52616b}
+.target-info-detail-panel .target-info-single-heading>b{font:700 13px 'DM Mono',monospace;color:#f0f4f5}
+.target-info-detail-panel .target-info-single-heading>span,.target-info-track-meta{font:8px 'DM Mono',monospace;color:#aebdc2}
+.target-info-detail-panel .target-info-single-heading>button{padding:5px 7px;border:1px solid #6c777c;background:#2a3439;color:#f0f2f2;font:8px 'DM Mono',monospace;cursor:pointer}
+.target-info-detail-panel .target-info-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:8px 0}
+.target-info-detail-panel .target-info-metrics>div{display:grid;grid-template-columns:1fr auto;gap:3px;padding:7px;background:#10191e;border:1px solid #3b4a51}
+.target-info-detail-panel .target-info-metrics small{grid-column:1/-1;color:#8fa0a6;font:8px 'DM Mono',monospace}
+.target-info-detail-panel .target-info-metrics b{color:#f0f3ed;font:600 12px 'DM Mono',monospace}
+.target-info-detail-panel .target-info-metrics em{align-self:end;color:#9eafb5;font:8px 'DM Mono',monospace;font-style:normal}
+.target-info-track-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:7px;padding:6px 2px;border-top:1px solid #3d4b51}
+.target-info-detail-panel .target-info-empty{padding:12px;text-align:center;color:#a8b6bb;font:9px 'DM Mono',monospace}
+@media(max-width:560px){.target-info-expanded-blocks{grid-template-columns:repeat(2,minmax(0,1fr));max-height:45vh;overflow-y:auto}.target-info-expanded-blocks button{font-size:8px}.target-info-detail-panel .target-info-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.target-info-detail-panel .target-info-single-heading{flex-wrap:wrap}}
