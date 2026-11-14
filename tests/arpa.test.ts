@@ -23,8 +23,8 @@ describe("ARPA acquisition and tracking", () => {
 
   it("smooths a sequence of measurements with a least-squares estimate", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget({ ...target, yNm: 10 }, 0) };
-    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 10 - 5 / 3600 * 2.5 + 0.0001 }], 2.5);
-    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 10 - 5 / 3600 * 5 - 0.0001 }], 5);
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 10 - 5 / 3600 * 2.5 + 0.00001 }], 2.5);
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 10 - 5 / 3600 * 5 - 0.00001 }], 5);
     expect(tracks.T1.estimatedSpeedKn).toBeCloseTo(5, 1);
   });
 
