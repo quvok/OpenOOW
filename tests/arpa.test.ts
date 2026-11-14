@@ -102,6 +102,21 @@ describe("ARPA acquisition and tracking", () => {
     expect(tracks.A.swapCount).toBe(1);
   });
 
+  it("chooses the globally best one-to-one association instead of a greedy local match", () => {
+    const tracks: ArpaTrackSet = {
+      A: acquireArpaTarget({ id: "A", xNm: 0, yNm: 0 }, 0),
+      B: acquireArpaTarget({ id: "B", xNm: 2.5, yNm: 0 }, 0),
+    };
+    const next = updateArpaTracks(tracks, [
+      { id: "E1", xNm: 0.5, yNm: 0 },
+      { id: "E2", xNm: -0.7, yNm: 0 },
+    ], 2.5, DEFAULT_ARPA_LOST_AFTER_SECONDS, 2.1);
+    expect(next.A.associatedRadarId).toBe("E2");
+    expect(next.B.associatedRadarId).toBe("E1");
+    expect(next.A.lastMeasurementSeconds).toBe(2.5);
+    expect(next.B.lastMeasurementSeconds).toBe(2.5);
+  });
+
   it("does not associate echoes outside the prediction gate", () => {
     const tracks = { T1: acquireArpaTarget(target, 0) };
     const next = updateArpaTracks(tracks, [{ id: "T1", xNm: 1, yNm: 1 }], 2.5);
