@@ -331,6 +331,17 @@ export default function App() {
         environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, targetNavigatingChannel: colregTargetNavigatingChannel, ownInshoreTrafficZone: colregOwnInshoreZone, targetWindwardOfOwn: colregTargetWindwardOfOwn === "unknown" ? null : colregTargetWindwardOfOwn === "yes", ownOvertakingNotClear: colregOwnOvertakingNotClear, targetOvertakingNotClear: colregTargetOvertakingNotClear, bearingHistoryDeg: selectedColregHistory.slice(-8).map((sample) => (Math.atan2(sample.xNm, sample.yNm) * 180 / Math.PI + 360) % 360), rangeHistoryNm: selectedColregHistory.slice(-8).map((sample) => Math.hypot(sample.xNm, sample.yNm)), riskDcpaNm: alertDcpaNm },
       })
     : null;
+  const colregResponsibilityLabel = colregAssessment?.responsibility === "give-way" ? "GIVE-WAY"
+    : colregAssessment?.responsibility === "stand-on" ? "STAND-ON"
+    : colregAssessment?.responsibility === "both-act" ? "BOTH ALTER STARBOARD"
+    : colregAssessment?.responsibility === "no-impede" ? "DO NOT IMPEDE"
+    : colregAssessment?.responsibility === "no-specific-duty" ? "NO AUTOMATIC PRIORITY" : "CHECK CONTEXT";
+  const colregRiskLabel = colregAssessment?.collisionRisk === "risk" ? "CPA RISK"
+    : colregAssessment?.collisionRisk === "no-immediate-risk" ? "NO IMMEDIATE RISK" : "CPA N/A";
+  const colregRule7Summary = !colregAssessment ? "Нет оценки"
+    : colregAssessment.rule7RiskIndication ? "Возможная опасность: пеленг практически постоянен, дистанция уменьшается"
+    : "Пеленг: " + (colregAssessment.bearingTrend === "insufficient" ? "недостаточно данных" : colregAssessment.bearingTrend === "stable" ? "стабильный" : "изменяется")
+      + " · дистанция: " + (colregAssessment.rangeTrend === "insufficient" ? "недостаточно данных" : colregAssessment.rangeTrend === "decreasing" ? "уменьшается" : colregAssessment.rangeTrend === "increasing" ? "увеличивается" : "без изменения");
   const ownRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregOwnKind, lengthM: colregOwnLengthM, underway: colregOwnKind !== "anchored" && colregOwnKind !== "aground", makingWay: colregOwnMakingWay, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, engagedInFishing: colregOwnFishing }) : null;
   const targetRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregTargetKind, lengthM: colregTargetLengthM, underway: colregTargetKind !== "anchored" && colregTargetKind !== "aground", makingWay: colregTargetMakingWay, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, engagedInFishing: colregTargetFishing }) : null;
   const ownLightRanges = colregAssessment ? getLightVisibilityMinimums(colregOwnLengthM) : null;
@@ -547,12 +558,15 @@ export default function App() {
               </div>
             </div>
             {colregAssessment ? <>
-              <div className="colreg-rule-line"><strong>{colregAssessment.primaryRule ? "ПРАВИЛО " + colregAssessment.primaryRule : "ПРАВИЛО НЕ ОПРЕДЕЛЕНО"}</strong><span>{colregAssessment.responsibility === "give-way" ? "GIVE-WAY" : colregAssessment.responsibility === "stand-on" ? "STAND-ON" : colregAssessment.responsibility === "both-act" ? "BOTH ALTER STARBOARD" : colregAssessment.responsibility === "no-impede" ? "DO NOT IMPEDE" : colregAssessment.responsibility === "no-specific-duty" ? "NO AUTOMATIC PRIORITY" : "CHECK CONTEXT"} · {colregAssessment.collisionRisk === "risk" ? "CPA RISK" : colregAssessment.collisionRisk === "no-immediate-risk" ? "NO IMMEDIATE RISK" : "CPA N/A"}</span></div>
+              <div className="colreg-rule-line">
+                <strong>{colregAssessment.primaryRule ? "ПРАВИЛО " + colregAssessment.primaryRule : "ПРАВИЛО НЕ ОПРЕДЕЛЕНО"}</strong>
+                <span>{colregResponsibilityLabel} · {colregRiskLabel}</span>
+              </div>
               <h3 className="colreg-title">{colregAssessment.title}</h3>
               <p className="colreg-duty">{colregAssessment.ownShipDuty}</p>
               <div className={colregAssessment.rule7RiskIndication ? "colreg-rule7-line active" : "colreg-rule7-line"}>
                 <strong>RULE 7 · RADAR PLOT</strong>
-                <span>{colregAssessment.rule7RiskIndication ? "Возможная опасность: пеленг практически постоянен, дистанция уменьшается" : "Пеленг: " + (colregAssessment.bearingTrend === "insufficient" ? "недостаточно данных" : colregAssessment.bearingTrend === "stable" ? "стабильный" : "изменяется") + " · дистанция: " + (colregAssessment.rangeTrend === "insufficient" ? "недостаточно данных" : colregAssessment.rangeTrend === "decreasing" ? "уменьшается" : colregAssessment.rangeTrend === "increasing" ? "увеличивается" : "без изменения")}</span>
+                <span>{colregRule7Summary}</span>
               </div>
               <div className="colreg-readouts">
                 <div><small>ПЕЛЕНГ ЦЕЛИ</small><b>{colregAssessment.targetRelativeBearingDeg.toFixed(1)}° от носа</b></div>
@@ -564,8 +578,42 @@ export default function App() {
               </div>
               <div className="colreg-applicable-rules"><b>Применимые обязанности</b>{colregAssessment.applicableRules.map((item, index) => <div key={item.rule + "-" + index}><strong>П{item.rule} · {item.title}</strong><span>{item.duty}</span></div>)}</div>
               {colregManeuver && <div className="colreg-maneuver"><b>Проверка пробного манёвра</b><strong className={colregManeuver.cpaTrend}>{colregManeuver.cpaTrend === "improved" ? "CPA УЛУЧШАЕТСЯ" : colregManeuver.cpaTrend === "degraded" ? "CPA УХУДШАЕТСЯ" : colregManeuver.cpaTrend === "unchanged" ? "БЕЗ СУЩЕСТВЕННЫХ ИЗМЕНЕНИЙ" : "НЕДОСТАТОЧНО ДАННЫХ"}</strong><span>{colregManeuver.observation}</span><small>{colregManeuver.caution}</small></div>}
-              <details className="colreg-signals"><summary>Огни и знаки: {colregAssessment.ownLightGuidance.title}</summary><b>Собственное судно · правило {colregAssessment.ownLightGuidance.rule}</b><small>Правило 22 · длина {colregOwnLengthM} м ({ownLightRanges?.vesselLengthBand}): топовый {ownLightRanges?.mastheadNm} NM, бортовые {ownLightRanges?.sidelightsNm} NM, кормовой {ownLightRanges?.sternNm} NM, буксировочный {ownLightRanges?.towingNm} NM, круговой {ownLightRanges?.allRoundNm} NM.</small><ul>{colregAssessment.ownLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>{colregAssessment.ownLightGuidance.dayShapes.length > 0 && <><b>Дневные знаки</b><ul>{colregAssessment.ownLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul></>}{colregAssessment.ownLightGuidance.notes.length > 0 && <><b>Примечания</b><ul>{colregAssessment.ownLightGuidance.notes.map((item) => <li key={item}>{item}</li>)}</ul></>}</details>
-              <details className="colreg-signals"><summary>Огни и знаки цели: {colregAssessment.targetLightGuidance.title}</summary><b>Цель · правило {colregAssessment.targetLightGuidance.rule}</b><small>Правило 22 · длина {colregTargetLengthM} м ({targetLightRanges?.vesselLengthBand}): топовый {targetLightRanges?.mastheadNm} NM, бортовые {targetLightRanges?.sidelightsNm} NM, кормовой {targetLightRanges?.sternNm} NM, буксировочный {targetLightRanges?.towingNm} NM, круговой {targetLightRanges?.allRoundNm} NM.</small><ul>{colregAssessment.targetLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>{colregAssessment.targetLightGuidance.dayShapes.length > 0 && <><b>Дневные знаки</b><ul>{colregAssessment.targetLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul></>}{colregAssessment.targetLightGuidance.notes.length > 0 && <><b>Примечания</b><ul>{colregAssessment.targetLightGuidance.notes.map((item) => <li key={item}>{item}</li>)}</ul>}</details>
+              <details className="colreg-signals">
+                <summary>Огни и знаки: {colregAssessment.ownLightGuidance.title}</summary>
+                <b>Собственное судно · правило {colregAssessment.ownLightGuidance.rule}</b>
+                <small>Правило 22 · длина {colregOwnLengthM} м ({ownLightRanges?.vesselLengthBand}): топовый {ownLightRanges?.mastheadNm} NM, бортовые {ownLightRanges?.sidelightsNm} NM, кормовой {ownLightRanges?.sternNm} NM, буксировочный {ownLightRanges?.towingNm} NM, круговой {ownLightRanges?.allRoundNm} NM.</small>
+                <ul>{colregAssessment.ownLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>
+                {colregAssessment.ownLightGuidance.dayShapes.length > 0 && (
+                  <>
+                    <b>Дневные знаки</b>
+                    <ul>{colregAssessment.ownLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul>
+                  </>
+                )}
+                {colregAssessment.ownLightGuidance.notes.length > 0 && (
+                  <>
+                    <b>Примечания</b>
+                    <ul>{colregAssessment.ownLightGuidance.notes.map((item) => <li key={item}>{item}</li>)}</ul>
+                  </>
+                )}
+              </details>
+              <details className="colreg-signals">
+                <summary>Огни и знаки цели: {colregAssessment.targetLightGuidance.title}</summary>
+                <b>Цель · правило {colregAssessment.targetLightGuidance.rule}</b>
+                <small>Правило 22 · длина {colregTargetLengthM} м ({targetLightRanges?.vesselLengthBand}): топовый {targetLightRanges?.mastheadNm} NM, бортовые {targetLightRanges?.sidelightsNm} NM, кормовой {targetLightRanges?.sternNm} NM, буксировочный {targetLightRanges?.towingNm} NM, круговой {targetLightRanges?.allRoundNm} NM.</small>
+                <ul>{colregAssessment.targetLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>
+                {colregAssessment.targetLightGuidance.dayShapes.length > 0 && (
+                  <>
+                    <b>Дневные знаки</b>
+                    <ul>{colregAssessment.targetLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul>
+                  </>
+                )}
+                {colregAssessment.targetLightGuidance.notes.length > 0 && (
+                  <>
+                    <b>Примечания</b>
+                    <ul>{colregAssessment.targetLightGuidance.notes.map((item) => <li key={item}>{item}</li>)}</ul>
+                  </>
+                )}
+              </details>
               <details className="colreg-limitations"><summary>Ограничения автоматической оценки</summary><ul>{colregAssessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
             </> : <p className="cpa-note compact-note">Выберите отметку на PPI, захватите её в ARPA и дождитесь статуса TRACK. После этого оценка использует измеренное положение и оценённые ARPA курс/скорость. Контекст судов и навигации можно задать выше.</p>}
             {colregVisibility === "restricted" && <div className="colreg-applicable-rules">
