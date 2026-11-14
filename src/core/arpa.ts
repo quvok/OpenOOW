@@ -190,8 +190,8 @@ function restartTrack(track: ArpaTrack, measurement: Pick<RadarMeasurement, "id"
 
 /**
  * Associate echoes to existing logical tracks by predicted position. The
- * one-to-one minimum-distance assignment prevents two tracks consuming one
- * echo. A changed echo identity is surfaced as a Target Swap event.
+ * global minimum-cost one-to-one assignment prevents two tracks consuming
+ * one echo while maximizing valid associations within the gate. A changed echo identity is surfaced as a Target Swap event.
  *
  * This is a deterministic teaching association model, not a certified ARPA
  * tracking algorithm. Measurements are consumed only on completed radar scans.
