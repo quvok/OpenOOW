@@ -184,6 +184,29 @@ describe("COLREG context and encounter assessment", () => {
     expect(onWater.ownLightGuidance.rule).toBe(23);
   });
 
+
+  it("overrides a sailing vessel's Rule 18 stand-on status when Rule 9 forbids impeding a channel-limited target", () => {
+    const result = assessColregEncounter(own(), target(1, 1, 270, 8), {
+      ownProfile: { kind: "sailing", lengthM: 25 },
+      targetProfile: { kind: "power-driven", lengthM: 180 },
+      environment: { narrowChannel: true, targetCanOnlyNavigateChannel: true },
+    });
+    expect(result.primaryRule).toBe(18);
+    expect(result.responsibility).toBe("no-impede");
+    expect(result.ownShipDuty).toContain("правилу 9");
+  });
+
+  it("overrides a small vessel's Rule 15 stand-on status when Rule 10 says not to impede lane traffic", () => {
+    const result = assessColregEncounter(own(90, 10), target(1, -0.2, 0, 8), {
+      ownProfile: { kind: "power-driven", lengthM: 15 },
+      targetProfile: { kind: "power-driven", lengthM: 120 },
+      environment: { trafficSeparationScheme: true, targetFollowingTrafficLane: true },
+    });
+    expect(result.primaryRule).toBe(15);
+    expect(result.responsibility).toBe("no-impede");
+    expect(result.ownShipDuty).toContain("правилу 10");
+  });
+
   it("does not give a constrained-draught vessel automatic right of way", () => {
     const result = assessColregEncounter(own(), target(1, 1, 270, 8), {
       targetProfile: { kind: "constrained-draught" },
