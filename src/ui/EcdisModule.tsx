@@ -68,7 +68,6 @@ export default function EcdisModule({ ship, targets }: Props) {
     const py = (event.clientY - rect.top) * HEIGHT / rect.height;
     const eastNm = ship.eastNm + (px - CENTER_X) / (SCALE * chartScale);
     const northNm = ship.northNm + (CENTER_Y - py) / (SCALE * chartScale);
-    if (Math.abs(eastNm) > 11.5 || Math.abs(northNm) > 8.2) return;
     setRoute((current) => [...current, makeWaypoint(current.length + 1, Number(eastNm.toFixed(3)), Number(northNm.toFixed(3)))]);
     setStatusMessage("Маршрутная точка добавлена. Продолжайте прокладку или отключите режим редактирования.");
   };
