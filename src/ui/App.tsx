@@ -8,6 +8,7 @@ import { acquireArpaTarget, calculateArpaSolution, calculateTrialManoeuvre, upda
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
+import { assessColregEncounter } from "../core/colreg";
 
 const STEP_SECONDS = 0.1;
 const RADAR_RANGE_NM = 3;
@@ -221,6 +222,8 @@ export default function App() {
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
   const selectedMeasurement = radarMeasurements.find((item) => item.id === selectedRadarTargetId) ?? null;
+  const selectedColregTarget = targets.find((target) => target.id === selectedRadarTargetId) ?? null;
+  const colregAssessment = selectedColregTarget ? assessColregEncounter(ownVessel, selectedColregTarget, { restrictedVisibility: activeScenario.visibilityNm <= 2, riskDcpaNm: alertDcpaNm }) : null;
   const selectedTrack = selectedRadarTargetId ? Object.values(arpaTracks).find((track) => track.associatedRadarId === selectedRadarTargetId) ?? arpaTracks[selectedRadarTargetId] : undefined;
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
@@ -390,6 +393,22 @@ export default function App() {
               })}
             </div> : <p className="cpa-note compact-note">Нет захваченных целей. Выберите эхо на PPI и нажмите «Захватить ARPA».</p>}
             <div className="arpa-threshold-line">ALARM: DCPA {alertDcpaNm.toFixed(1)} NM · TCPA {alertTcpaMinutes} MIN</div>
+          </section>
+          <section className="panel console-panel colreg-live-panel">
+            <div className="panel-heading"><div><span className="eyebrow">COLREG ASSESSMENT</span><h2>Оценка ситуации</h2></div><span className="unit">МППСС-72</span></div>
+            {colregAssessment ? <>
+              <div className="colreg-rule-line"><strong>{colregAssessment.rule ? "ПРАВИЛО " + colregAssessment.rule : "ПРАВИЛО НЕ ОПРЕДЕЛЕНО"}</strong><span>{colregAssessment.collisionRisk === "risk" ? "CPA RISK" : colregAssessment.collisionRisk === "no-immediate-risk" ? "NO IMMEDIATE RISK" : "CPA N/A"}</span></div>
+              <h3 className="colreg-title">{colregAssessment.title}</h3>
+              <p className="colreg-duty">{colregAssessment.ownShipDuty}</p>
+              <div className="colreg-readouts">
+                <div><small>ПЕЛЕНГ ЦЕЛИ</small><b>{colregAssessment.targetRelativeBearingDeg.toFixed(1)}° от носа</b></div>
+                <div><small>КУРСОВАЯ РАЗНИЦА</small><b>{colregAssessment.courseDifferenceDeg.toFixed(1)}°</b></div>
+                <div><small>DCPA</small><b>{colregAssessment.dcpaNm === null ? "—" : colregAssessment.dcpaNm.toFixed(2) + " NM"}</b></div>
+                <div><small>TCPA</small><b>{colregAssessment.tcpaMin === null ? "—" : formatMinutes(colregAssessment.tcpaMin)}</b></div>
+              </div>
+              <details className="colreg-limitations"><summary>Ограничения автоматической оценки</summary><ul>{colregAssessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
+            </> : <p className="cpa-note compact-note">Выберите радиолокационную отметку на PPI. Модуль покажет геометрически вероятную ситуацию и возможное правило-кандидат.</p>}
+            <p className="cpa-note compact-note">Учебная подсказка, не юридическое заключение и не команда к манёвру.</p>
           </section>
           <section className="panel console-panel trial-quick-panel">
             <div className="panel-heading"><div><span className="eyebrow">TRIAL MANOEUVRE</span><h2>Пробный манёвр</h2></div></div>
