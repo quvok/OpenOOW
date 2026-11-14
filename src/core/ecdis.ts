@@ -190,7 +190,7 @@ export function assessRoute(
   if (shallowWaterIntersections.size) warnings.push("Недостаточная картографическая глубина: " + [...shallowWaterIntersections].join(", "));
   if (hazardIntersections.size) warnings.push("Маршрут проходит вблизи навигационных опасностей: " + [...hazardIntersections].join(", "));
   return {
-    safe: route.length >= 2 && warnings.length === 1 && warnings[0].startsWith("Для проверки") === false,
+    safe: route.length >= 2 && landIntersections.size === 0 && shallowWaterIntersections.size === 0 && hazardIntersections.size === 0,
     totalDistanceNm: totalRouteDistanceNm(route),
     minimumChartedDepthM,
     requiredDepthM,
