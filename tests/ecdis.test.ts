@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assessRoute, bearingDeg, buildRouteLegs, calculateActiveLegNavigation, calculateCrossTrackError, calculateWheelOverDistanceNm, classifyDepth, resolveActiveLegIndex,
-  chartedDepthAt, distanceNm, formatCoordinate, pointInPolygon, toGeographicPosition,
+  chartedDepthAt, distanceNm, formatCoordinate, fromGeographicPosition, pointInPolygon, toGeographicPosition,
   type RouteWaypoint,
 } from "../src/core/ecdis";
 
@@ -129,5 +129,16 @@ describe("ECDIS active route monitoring", () => {
     expect(classifyDepth(9, settings)).toBe("safety");
     expect(classifyDepth(15, settings)).toBe("shallow");
     expect(classifyDepth(30, settings)).toBe("deep");
+  });
+});
+
+describe("ECDIS geographic route exchange", () => {
+  it("round-trips local positions through geographic coordinates", () => {
+    const origin = { latitudeDeg: 43.1, longitudeDeg: 131.9 };
+    const local = { eastNm: 4.25, northNm: -2.75 };
+    const geographic = toGeographicPosition(local, origin);
+    const restored = fromGeographicPosition(geographic, origin);
+    expect(restored.eastNm).toBeCloseTo(local.eastNm, 5);
+    expect(restored.northNm).toBeCloseTo(local.northNm, 5);
   });
 });
