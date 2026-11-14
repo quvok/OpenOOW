@@ -48,7 +48,7 @@ describe("COLREG rule reference", () => {
 describe("COLREG context and encounter assessment", () => {
   it("always includes the general duties in Rules 5 to 8", () => {
     const result = assessColregEncounter(own(), target(0, 2));
-    expect(result.applicableRules.map((rule) => rule.rule)).toEqual(expect.arrayContaining([5, 6, 7, 8]));
+    expect(result.applicableRules.map((rule) => rule.rule)).toEqual(expect.arrayContaining([1, 2, 3, 4, 5, 6, 7, 8]));
   });
 
   it("applies Rule 19 only when visibility is restricted and vessels are not in sight", () => {
