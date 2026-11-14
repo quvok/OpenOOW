@@ -147,6 +147,7 @@ export function pointInPolygon(point: LocalPosition, polygon: LocalPosition[]): 
 }
 
 export function chartedDepthAt(position: LocalPosition, areas: ChartArea[], defaultDepthM: number | null = null): number | null {
+  if (areas.some((area) => area.kind === "land" && pointInPolygon(position, area.polygon))) return null;
   const containing = areas.filter((area) =>
     (area.kind === "charted" || area.kind === "shallow") && pointInPolygon(position, area.polygon));
   if (!containing.length) return defaultDepthM;
