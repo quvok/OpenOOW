@@ -486,12 +486,14 @@ export function importGeoJsonChart(input: unknown, origin: GeoOrigin, chartName 
     } else if (geometryType === "Point") {
       const position = geoJsonPosition(coordinates, origin);
       if (!position) continue;
-      if (isSounding && depth !== null) soundings.push({ id, depthM: depth, position });
+      if (isSounding && (depth !== null || (Array.isArray(coordinates) && typeof coordinates[2] === "number"))) soundings.push({ id, depthM: depth ?? Number(coordinates[2]), position });
       else if (isHazard) hazards.push({ id, name, position, radiusNm: 0.08 });
     } else if (geometryType === "MultiPoint" && isSounding && Array.isArray(coordinates)) {
       coordinates.forEach((coordinate, part) => {
         const position = geoJsonPosition(coordinate, origin);
-        if (position && depth !== null) soundings.push({ id: id + "-" + part, depthM: depth, position });
+        const coordinateDepth = Array.isArray(coordinate) && typeof coordinate[2] === "number" ? coordinate[2] : null;
+        const soundingDepth = depth ?? coordinateDepth;
+        if (position && soundingDepth !== null) soundings.push({ id: id + "-" + part, depthM: soundingDepth, position });
       });
     }
     featureCount += 1;
