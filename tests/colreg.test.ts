@@ -20,7 +20,7 @@ describe("COLREG rule reference", () => {
   });
 
   it("provides light guidance for all modeled vessel categories", () => {
-    for (const kind of ["power-driven", "sailing", "fishing", "nuc", "ram", "constrained-draught", "pilot", "towing", "anchored", "aground", "seaplane", "other"] as const) {
+    for (const kind of ["power-driven", "sailing", "fishing", "nuc", "ram", "constrained-draught", "pilot", "towing", "anchored", "aground", "seaplane", "wig-craft", "other"] as const) {
       expect(getVesselLightGuidance(kind).lights.length).toBeGreaterThan(0);
     }
   });
@@ -145,6 +145,22 @@ describe("COLREG context and encounter assessment", () => {
     });
     expect(result.primaryRule).toBe(18);
     expect(result.responsibility).toBe("give-way");
+  });
+
+
+  it("applies Rule 18(f) to a WIG in flight and power-driven rules when on the water", () => {
+    const airborne = assessColregEncounter(own(), target(1, 1, 270, 8), {
+      ownProfile: { kind: "wig-craft", wigOnSurface: false },
+      targetProfile: { kind: "power-driven" },
+    });
+    expect(airborne.primaryRule).toBe(18);
+    expect(airborne.responsibility).toBe("give-way");
+    const onWater = assessColregEncounter(own(), target(1, 1, 270, 8), {
+      ownProfile: { kind: "wig-craft", wigOnSurface: true },
+      targetProfile: { kind: "power-driven" },
+    });
+    expect(onWater.encounter).toBe("crossing-starboard");
+    expect(onWater.ownLightGuidance.rule).toBe(23);
   });
 
   it("does not give a constrained-draught vessel automatic right of way", () => {
