@@ -3,6 +3,7 @@ import type { VesselState } from "../src/core/navigation";
 import {
   acquireArpaTarget,
   calculateArpaSolution,
+  calculateBowCrossing,
   calculateTrialManoeuvre,
   updateArpaTracks,
   isArpaCloseApproachAlert,
@@ -16,6 +17,19 @@ const target: VesselState = { id: "T1", xNm: 0, yNm: 2, courseDeg: 180, speedKn:
 const own: VesselState = { id: "OWN", xNm: 0, yNm: 0, courseDeg: 0, speedKn: 10 };
 
 describe("ARPA acquisition and tracking", () => {
+  it("calculates signed bow crossing range and time", () => {
+    const track = { ...acquireArpaTarget({ id: "T1", xNm: 1, yNm: 2 }, 0), status: "tracking" as const, targetVelocityEastKn: -5, targetVelocityNorthKn: 0 };
+    const result = calculateBowCrossing(track, { xNm: 1, yNm: 2 }, own);
+    expect(result.bctMin).toBeCloseTo(12);
+    expect(result.bcrNm).toBeCloseTo(2);
+  });
+
+  it("returns unavailable bow crossing data for parallel or untracked targets", () => {
+    expect(calculateBowCrossing(acquireArpaTarget(target, 0), target, own)).toEqual({ bcrNm: null, bctMin: null });
+    const parallel = { ...acquireArpaTarget(target, 0), status: "tracking" as const, targetVelocityEastKn: 0, targetVelocityNorthKn: 5 };
+    expect(calculateBowCrossing(parallel, target, own)).toEqual({ bcrNm: null, bctMin: null });
+  });
+
   it("starts in acquiring state with one measured position", () => {
     const track = acquireArpaTarget(target, 0);
     expect(track.status).toBe("acquiring");
