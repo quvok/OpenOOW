@@ -585,3 +585,9 @@ input[type=range]{accent-color:#a6b58b}
 .trial-rot-readout span{font:8px 'DM Mono',monospace;letter-spacing:.4px}
 .trial-rot-readout b{color:#e1e9df;font:600 12px 'DM Mono',monospace}
 .trial-rot-readout small{color:#8da4a8;font:7px 'DM Mono',monospace;line-height:1.35}
+
+
+/* ECDIS chart coverage and configurable safety contours */
+.ecdis-charted-water{fill:#12313a;fill-opacity:.34;stroke:#28515b;stroke-width:1.2;stroke-dasharray:5 4}
+.ecdis-shallow.ecdis-depth-danger{fill:#a74735;fill-opacity:.42;stroke:#e17b5d;stroke-width:2}
+.ecdis-shallow.ecdis-depth-safety{fill:#b58b3d;fill-opacity:.32;stroke:#d9b65d;stroke-width:1.8}
