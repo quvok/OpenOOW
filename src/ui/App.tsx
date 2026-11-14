@@ -4,7 +4,7 @@ import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, velocityFromCourse, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
-import { acquireArpaTarget, calculateArpaSolution, calculateBowCrossing, calculateTrialManoeuvre, calculateDynamicTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
+import { acquireArpaTarget, calculateArpaSolution, calculateBowCrossing, calculateDynamicTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { createAutopilotState, stepAutopilot, type AutopilotState } from "../core/autopilot";
@@ -735,13 +735,6 @@ export default function App() {
             <details className="colreg-rulebook"><summary>Справочник МППСС-72 · все правила 1–41</summary>{COLREG_RULES.map((rule) => <div className="colreg-rulebook-row" key={rule.number}><strong>Правило {rule.number} · {rule.title}</strong><small>{rule.part}{rule.operational ? "" : " · административная часть"}</small><span>{rule.summary}</span></div>)}</details>
             <p className="cpa-note compact-note">Учебная оценка не распознаёт огни/знаки автоматически и не является юридическим заключением или командой к манёвру. Правила 39–41 относятся к проверке выполнения Конвенции государствами, а не к расхождению судов.</p>
           </section>
-          <section className="panel console-panel trial-quick-panel">
-            <div className="panel-heading"><div><span className="eyebrow">TRIAL MANOEUVRE</span><h2>Пробный манёвр</h2></div></div>
-            <div className="console-field"><label htmlFor="trial-course-quick">Курс, °T</label><input id="trial-course-quick" type="number" min="0" max="359" step="1" value={trialCourseDeg} onChange={(event) => setTrialCourseDeg(Math.max(0, Math.min(359, Number(event.target.value) || 0)))}/></div>
-            <div className="console-field"><label htmlFor="trial-speed-quick">Скорость, kn</label><input id="trial-speed-quick" type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={(event) => setTrialSpeedKn(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></div>
-            <button type="button" className="secondary arpa-action trial-reset" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); }}>ТЕКУЩИЕ ПАРАМЕТРЫ</button>
-            <p className="cpa-note compact-note">Гипотетический расчёт. Фактический курс и скорость судна не изменяются.</p>
-          </section>
           <section className="panel autopilot-panel">
             <div className="panel-heading"><div><span className="eyebrow">HEADING CONTROL</span><h2>Автопилот</h2></div><span className={autopilot.engaged ? (Math.abs(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180) > autopilot.offCourseAlarmDeg ? "autopilot-badge alarm" : "autopilot-badge active") : "autopilot-badge"}>{autopilot.engaged ? (Math.abs(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180) > autopilot.offCourseAlarmDeg ? "OFF COURSE" : "AUTO") : "STANDBY"}</span></div>
             <div className="autopilot-readouts">
@@ -815,10 +808,15 @@ export default function App() {
           <span>Учебные пороги, не норматив COLREG</span>
         </div>
         <div className="trial-controls">
-          <div><span className="eyebrow">TRIAL MANOEUVRE · ПРОБНЫЙ МАНЁВР</span><p>Расчёт прогнозируемого CPA/TCPA при гипотетическом курсе и скорости собственного судна. Реальное управление не меняется.</p></div>
-          <label>Пробный курс, °T <input type="number" min="0" max="359" step="1" value={trialCourseDeg} onChange={(event) => setTrialCourseDeg(Math.max(0, Math.min(359, Number(event.target.value) || 0)))}/></label>
-          <label>Пробная скорость, kn <input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={(event) => setTrialSpeedKn(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></label>
-          <button type="button" className="secondary arpa-action" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); }}>Текущие параметры</button>
+          <div><span className="eyebrow">TRIAL MANOEUVRE · DYNAMIC</span><p>Сценарий собственного манёвра. Задержка до начала, конечный курс/скорость, ROT и темпы разгона/торможения. Векторы целей продолжают обновляться.</p></div>
+          <label>SET CSE °T <input type="number" min="0" max="359" step="1" value={trialCourseDeg} onChange={e=>setTrialCourseDeg(Math.max(0,Math.min(359,Number(e.target.value)||0)))}/></label>
+          <label>SET SPD kn <input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={e=>setTrialSpeedKn(Math.max(0,Math.min(30,Number(e.target.value)||0)))}/></label>
+          <label>DELAY min <input type="number" min="0" max="30" step="0.5" value={trialDelayMin} onChange={e=>setTrialDelayMin(Math.max(0,Math.min(30,Number(e.target.value)||0)))}/></label>
+          <label>ROT °/min <input type="number" min="0.1" max="30" step="0.5" value={trialRotDegPerMin} onChange={e=>setTrialRotDegPerMin(Math.max(0.1,Math.min(30,Number(e.target.value)||0.1)))}/></label>
+          <label>ACC kn/min <input type="number" min="0" max="5" step="0.1" value={trialAcceleration} onChange={e=>setTrialAcceleration(Math.max(0,Math.min(5,Number(e.target.value)||0)))}/></label>
+          <label>DEC kn/min <input type="number" min="0" max="5" step="0.1" value={trialDeceleration} onChange={e=>setTrialDeceleration(Math.max(0,Math.min(5,Number(e.target.value)||0)))}/></label>
+          <label>VECTOR min <input type="number" min="1" max="120" step="1" value={trialHorizonMin} onChange={e=>setTrialHorizonMin(Math.max(1,Math.min(120,Number(e.target.value)||1)))}/></label>
+          <button type="button" className="secondary arpa-action" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); setTrialDelayMin(3); setTrialRotDegPerMin(3); setTrialAcceleration(0.5); setTrialDeceleration(0.5); setTrialHorizonMin(20); }}>RESET TRIAL</button>
         </div>
         <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>ARPA-трек</th><th>Радарная отметка</th><th>Статус</th><th>Курс / скорость</th><th>TCPA</th><th>DCPA</th><th>Trial TCPA</th><th>Trial DCPA</th><th>Событие</th><th>Тревога</th><th>Действие</th></tr></thead><tbody>
           {Object.values(arpaTracks).map((track) => {
