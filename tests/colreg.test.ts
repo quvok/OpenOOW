@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessColregEncounter, evaluateColregManeuver } from "../src/core/colreg";
 import { COLREG_RULES } from "../src/core/colregRules";
-import { getSoundSignals, getVesselLightGuidance } from "../src/core/colregSignals";
+import { getLightVisibilityMinimums, getSoundSignals, getVesselLightGuidance } from "../src/core/colregSignals";
 import type { VesselState } from "../src/core/navigation";
 
 const own = (courseDeg = 0, speedKn = 10, xNm = 0, yNm = 0): VesselState => ({
@@ -121,7 +121,7 @@ describe("COLREG context and encounter assessment", () => {
   it("applies Rule 12(c) conservatively when own ship is on port tack and target tack is unknown", () => {
     const result = assessColregEncounter(own(), target(0, 2, 180, 8), {
       ownProfile: { kind: "sailing", tack: "port" },
-      targetProfile: { kind: "sailing", tack: "unknown" },
+      targetProfile: { kind: "sailing", tack: "unknown" },\n      environment: { targetWindwardOfOwn: true },
     });
     expect(result.primaryRule).toBe(12);
     expect(result.responsibility).toBe("give-way");
@@ -172,7 +172,44 @@ describe("COLREG context and encounter assessment", () => {
     expect(result.applicableRules.some((rule) => rule.rule === 20)).toBe(true);
   });
 
-  it("rejects invalid or coincident vessel states", () => {
+
+  it("keeps an overtaking obligation active until the vessels are finally past and clear", () => {
+    const result = assessColregEncounter(own(), target(0, 2, 180, 10), {
+      environment: { ownOvertakingNotClear: true },
+    });
+    expect(result.primaryRule).toBe(13);
+    expect(result.responsibility).toBe("give-way");
+  });
+
+  it("uses steady bearing and decreasing range as a Rule 7 risk indication", () => {
+    const result = assessColregEncounter(own(), target(1, 1, 270, 10), {
+      environment: {
+        bearingHistoryDeg: [45, 46, 46.2],
+        rangeHistoryNm: [2.4, 2.1, 1.8],
+        riskDcpaNm: 0,
+      },
+    });
+    expect(result.bearingTrend).toBe("stable");
+    expect(result.rangeTrend).toBe("decreasing");
+    expect(result.rule7RiskIndication).toBe(true);
+    expect(result.collisionRisk).toBe("risk");
+  });
+
+  it("does not infer a Rule 7 risk from too few radar plots", () => {
+    const result = assessColregEncounter(own(), target(1, 1, 270, 10), {
+      environment: { bearingHistoryDeg: [45, 45], rangeHistoryNm: [2, 1.9] },
+    });
+    expect(result.bearingTrend).toBe("insufficient");
+    expect(result.rule7RiskIndication).toBe(false);
+  });
+
+  it("returns Rule 22 minimum light ranges by vessel length", () => {
+    expect(getLightVisibilityMinimums(60).mastheadNm).toBe(6);
+    expect(getLightVisibilityMinimums(20).sidelightsNm).toBe(2);
+    expect(getLightVisibilityMinimums(8).sidelightsNm).toBe(1);
+    expect(() => getLightVisibilityMinimums(0)).toThrow(RangeError);
+  });
+\n  it("rejects invalid or coincident vessel states", () => {
     expect(() => assessColregEncounter(own(), target(0, 0))).toThrow(RangeError);
     expect(() => assessColregEncounter(own(), target(1, 1, 0, -1))).toThrow(RangeError);
     expect(() => assessColregEncounter(own(), target(1, 1), { environment: { riskDcpaNm: -1 } })).toThrow(RangeError);
