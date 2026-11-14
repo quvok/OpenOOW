@@ -226,6 +226,39 @@ describe("COLREG context and encounter assessment", () => {
     expect(result.collisionRisk).toBe("risk");
   });
 
+
+  it("applies the fishing-vessel restriction in a narrow channel independently of the target's draft", () => {
+    const result = assessColregEncounter(own(), target(1, 1, 270, 8), {
+      ownProfile: { kind: "fishing", engagedInFishing: true },
+      environment: { narrowChannel: true, targetNavigatingChannel: true },
+    });
+    expect(result.applicableRules.some((rule) => rule.rule === 9 && rule.title.includes("Рыболовное"))).toBe(true);
+  });
+
+  it("does not invent priority between two vessels constrained by draught", () => {
+    const result = assessColregEncounter(own(), target(1, 1, 270, 8), {
+      ownProfile: { kind: "constrained-draught" },
+      targetProfile: { kind: "constrained-draught" },
+    });
+    expect(result.responsibility).toBe("undetermined");
+  });
+
+  it("does not decide Rule 12 same-tack priority when windward data is contradictory", () => {
+    const result = assessColregEncounter(own(), target(0, 2, 180, 8), {
+      ownProfile: { kind: "sailing", tack: "starboard", windward: false },
+      targetProfile: { kind: "sailing", tack: "starboard", windward: false },
+    });
+    expect(result.primaryRule).toBe(12);
+    expect(result.responsibility).toBe("undetermined");
+  });
+
+  it("validates head-on tolerances and contradictory overtaking state", () => {
+    expect(() => assessColregEncounter(own(), target(0, 2), { headOnCourseToleranceDeg: 90 })).toThrow(RangeError);
+    expect(() => assessColregEncounter(own(), target(0, 2), {
+      environment: { ownOvertakingNotClear: true, targetOvertakingNotClear: true },
+    })).toThrow(RangeError);
+  });
+
   it("rejects invalid or coincident vessel states", () => {
     expect(() => assessColregEncounter(own(), target(0, 0))).toThrow(RangeError);
     expect(() => assessColregEncounter(own(), target(1, 1, 0, -1))).toThrow(RangeError);
