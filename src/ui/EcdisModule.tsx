@@ -4,7 +4,7 @@ import type { ShipDynamicsState } from "../core/shipDynamics";
 import type { VesselState } from "../core/navigation";
 import {
   assessRoute, bearingDeg, buildRouteLegs, calculateActiveLegNavigation, calculateWheelOverDistanceNm, chartedDepthAt,
-  distanceNm, formatCoordinate, fromGeographicPosition, resolveActiveLegIndex, toGeographicPosition, TRAINING_CHART_AREAS,
+  formatCoordinate, fromGeographicPosition, resolveActiveLegIndex, toGeographicPosition, TRAINING_CHART_AREAS,
   TRAINING_CHART_HAZARDS, type GeoOrigin, type RouteWaypoint,
 } from "../core/ecdis";
 
@@ -75,7 +75,6 @@ export default function EcdisModule({ ship, targets }: Props) {
   const legs = useMemo(() => buildRouteLegs(route), [route]);
   const ownDepth = chartedDepthAt(ownPosition, TRAINING_CHART_AREAS);
   const selectedWaypoint = route.find((point) => point.id === selectedWaypointId) ?? null;
-  const nextWaypoint = activeNavigation?.to ?? route[0] ?? null;
   const distanceToNext = activeNavigation?.distanceToWaypointNm ?? null;
   const bearingToNext = activeNavigation?.bearingToWaypointDeg ?? null;
   const remainingDistance = activeNavigation?.remainingRouteNm ?? routeAssessment.totalDistanceNm;
@@ -127,7 +126,8 @@ export default function EcdisModule({ ship, targets }: Props) {
   const exportRouteGpx = () => {
     const points = route.map((point) => {
       const geo = toGeographicPosition(point, origin);
-      return `    <rtept lat="${geo.latitudeDeg.toFixed(7)}" lon="${geo.longitudeDeg.toFixed(7)}"><name>${point.name}</name></rtept>`;
+      const safeName = point.name.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("\'", "&apos;");
+      return `    <rtept lat="${geo.latitudeDeg.toFixed(7)}" lon="${geo.longitudeDeg.toFixed(7)}"><name>${safeName}</name></rtept>`;
     }).join("\n");
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="OpenOOW" xmlns="http://www.topografix.com/GPX/1/1"><rte><name>OpenOOW route</name>\n${points}\n</rte></gpx>`;
     const url = URL.createObjectURL(new Blob([xml], { type: "application/gpx+xml;charset=utf-8" }));
@@ -145,8 +145,8 @@ export default function EcdisModule({ ship, targets }: Props) {
     try {
       const xml = new DOMParser().parseFromString(await file.text(), "application/xml");
       if (xml.querySelector("parsererror")) throw new Error("Некорректный XML");
-      const routePoints = Array.from(xml.querySelectorAll("rtept"));
-      const points = routePoints.length ? routePoints : Array.from(xml.querySelectorAll("wpt"));
+      const routePoints = Array.from(xml.getElementsByTagNameNS("*", "rtept"));
+      const points = routePoints.length ? routePoints : Array.from(xml.getElementsByTagNameNS("*", "wpt"));
       if (!points.length) throw new Error("В GPX нет маршрутных точек");
       const imported = points.map((point, index) => {
         const lat = Number(point.getAttribute("lat"));
@@ -156,7 +156,7 @@ export default function EcdisModule({ ship, targets }: Props) {
         }
         const local = fromGeographicPosition({ latitudeDeg: lat, longitudeDeg: lon }, origin);
         return { ...makeWaypoint(index + 1, Number(local.eastNm.toFixed(3)), Number(local.northNm.toFixed(3))),
-          name: point.querySelector("name")?.textContent?.trim() || "WP " + String(index + 1).padStart(2, "0") };
+          name: point.getElementsByTagNameNS("*", "name")[0]?.textContent?.trim() || "WP " + String(index + 1).padStart(2, "0") };
       });
       setRoute(imported);
       setActiveLegIndex(0);
@@ -282,7 +282,7 @@ export default function EcdisModule({ ship, targets }: Props) {
           {selectedWaypoint && <div className="ecdis-selected-waypoint"><b>{selectedWaypoint.name}</b>
             <label className="ecdis-setting"><span>E, NM</span><input type="number" step="0.001" value={selectedWaypoint.eastNm} onChange={(event)=>updateWaypoint(selectedWaypoint.id,"eastNm",event.target.value)}/></label>
             <label className="ecdis-setting"><span>N, NM</span><input type="number" step="0.001" value={selectedWaypoint.northNm} onChange={(event)=>updateWaypoint(selectedWaypoint.id,"northNm",event.target.value)}/></label>
-            <div className="ecdis-route-actions"><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,-1)}>ВЫШЕ</button><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,1)}>НИЖЕ</button><button type="button" className="ecdis-tool" onClick={()=>setRoute((current)=>current.filter((point)=>point.id!==selectedWaypoint.id))}>УДАЛИТЬ WP</button></div>
+            <div className="ecdis-route-actions"><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,-1)}>ВЫШЕ</button><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,1)}>НИЖЕ</button><button type="button" className="ecdis-tool" onClick={()=>setRoute((current)=>current.filter((point)=>point.id!==selectedWaypoint.id).map((point,index)=>({...point,id:"WP-"+String(index+1).padStart(2,"0"),name:"WP "+String(index+1).padStart(2,"0")})))}>УДАЛИТЬ WP</button></div>
           </div>}
           {route.length > 2 && <div className="ecdis-selected-waypoint"><b>WHEEL-OVER ESTIMATE</b><span>ROT {plannedRotDegPerMin.toFixed(0)}°/min · SOG {ship.speedKn.toFixed(1)} kn</span>{route.slice(1, -1).map((point, index) => {
             const incoming = bearingDeg(route[index], point);
