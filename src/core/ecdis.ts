@@ -353,3 +353,152 @@ export function fromGeographicPosition(position: GeoOrigin, origin: GeoOrigin): 
     Math.max(0.01, Math.cos(originLatitudeRad));
   return { eastNm, northNm };
 }
+
+
+export interface ChartContour {
+  id: string;
+  depthM: number;
+  points: LocalPosition[];
+}
+
+export interface ChartSounding {
+  id: string;
+  depthM: number;
+  position: LocalPosition;
+}
+
+export interface ImportedChartData {
+  name: string;
+  areas: ChartArea[];
+  hazards: ChartHazard[];
+  contours: ChartContour[];
+  soundings: ChartSounding[];
+  featureCount: number;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function numericProperty(properties: JsonRecord, names: string[]): number | null {
+  for (const name of names) {
+    const value = properties[name];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+  }
+  return null;
+}
+
+function stringProperty(properties: JsonRecord, names: string[]): string {
+  for (const name of names) {
+    const value = properties[name];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function geoJsonPosition(value: unknown, origin: GeoOrigin): LocalPosition | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const longitude = Number(value[0]);
+  const latitude = Number(value[1]);
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude) ||
+      Math.abs(longitude) > 180 || Math.abs(latitude) > 90) return null;
+  return fromGeographicPosition({ longitudeDeg: longitude, latitudeDeg: latitude }, origin);
+}
+
+function geoJsonLine(value: unknown, origin: GeoOrigin): LocalPosition[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((coordinate) => geoJsonPosition(coordinate, origin)).filter((point): point is LocalPosition => point !== null);
+}
+
+/**
+ * Imports a GeoJSON FeatureCollection in WGS-84 coordinates.
+ * S-57/S-101 ENC data must first be converted to GeoJSON by a chart tool such as GDAL/OGR;
+ * this function does not parse binary ENC cells or perform S-52 portrayal.
+ */
+export function importGeoJsonChart(input: unknown, origin: GeoOrigin, chartName = "Imported GeoJSON"): ImportedChartData {
+  const root = asRecord(input);
+  if (root.type !== "FeatureCollection" || !Array.isArray(root.features)) {
+    throw new Error("Ожидается GeoJSON FeatureCollection");
+  }
+  if (root.features.length > 100000) throw new Error("Слишком много объектов в файле карты (максимум 100 000)");
+  const areas: ChartArea[] = [];
+  const hazards: ChartHazard[] = [];
+  const contours: ChartContour[] = [];
+  const soundings: ChartSounding[] = [];
+  let featureCount = 0;
+
+  const addPolygon = (coordinates: unknown, id: string, name: string, kind: ChartArea["kind"], depthM?: number) => {
+    if (!Array.isArray(coordinates) || !Array.isArray(coordinates[0])) return;
+    const outer = geoJsonLine(coordinates[0], origin);
+    if (outer.length < 3) return;
+    areas.push({ id, name, kind, ...(depthM === undefined ? {} : { depthM }), polygon: outer });
+  };
+
+  for (let index = 0; index < root.features.length; index += 1) {
+    const feature = asRecord(root.features[index]);
+    if (feature.type !== "Feature") continue;
+    const geometry = asRecord(feature.geometry);
+    const properties = asRecord(feature.properties);
+    const geometryType = geometry.type;
+    const coordinates = geometry.coordinates;
+    if (typeof geometryType !== "string" || coordinates === undefined || coordinates === null) continue;
+
+    const layer = stringProperty(properties, ["layer", "LAYER", "acronym", "ACRONYM", "objl", "OBJL", "featureType", "kind", "type"]).toUpperCase();
+    const name = stringProperty(properties, ["name", "NAME", "OBJNAM", "objectName", "label"]) || layer || "Chart feature " + (index + 1);
+    const depth = numericProperty(properties, ["depthM", "DRVAL1", "VALSOU", "VALDCO", "DEPTH", "depth", "DRVAL2"]);
+    const idValue = feature.id;
+    const id = typeof idValue === "string" || typeof idValue === "number" ? String(idValue) : "chart-" + (index + 1);
+    const explicitKind = stringProperty(properties, ["kind", "category"]).toLowerCase();
+    const isLand = explicitKind === "land" || layer === "LNDARE" || layer === "COALNE" || layer.includes("LAND");
+    const isDepthArea = explicitKind === "charted" || explicitKind === "shallow" || layer === "DEPARE" || layer.includes("DEPTH_AREA");
+    const isContour = layer === "DEPCNT" || layer.includes("DEPTH_CONTOUR");
+    const isSounding = layer === "SOUNDG" || layer.includes("SOUNDING");
+    const isHazard = ["UWTROC", "WRECKS", "OBSTRN", "UnderwaterRock", "Wreck"].some((token) => layer.includes(token.toUpperCase()));
+
+    if (geometryType === "Polygon") {
+      if (isLand) addPolygon(coordinates, id, name, "land");
+      else if (isDepthArea) {
+        if (depth === null) continue;
+        addPolygon(coordinates, id, name, depth < 10 ? "shallow" : "charted", depth);
+      } else if (isHazard) {
+        const ring = geoJsonLine(Array.isArray(coordinates) ? coordinates[0] : [], origin);
+        if (ring.length) {
+          const center = ring.reduce((sum, point) => ({ eastNm: sum.eastNm + point.eastNm / ring.length, northNm: sum.northNm + point.northNm / ring.length }), { eastNm: 0, northNm: 0 });
+          hazards.push({ id, name, position: center, radiusNm: Math.max(0.05, ...ring.map((point) => distanceNm(point, center))) });
+        }
+      }
+    } else if (geometryType === "MultiPolygon" && Array.isArray(coordinates)) {
+      coordinates.forEach((polygon, part) => {
+        if (isLand) addPolygon(polygon, id + "-" + part, name, "land");
+        else if (isDepthArea && depth !== null) addPolygon(polygon, id + "-" + part, name, depth < 10 ? "shallow" : "charted", depth);
+      });
+    } else if (geometryType === "LineString") {
+      const points = geoJsonLine(coordinates, origin);
+      if (isContour && depth !== null && points.length >= 2) contours.push({ id, depthM: depth, points });
+    } else if (geometryType === "MultiLineString" && isContour && depth !== null && Array.isArray(coordinates)) {
+      coordinates.forEach((line, part) => {
+        const points = geoJsonLine(line, origin);
+        if (points.length >= 2) contours.push({ id: id + "-" + part, depthM: depth, points });
+      });
+    } else if (geometryType === "Point") {
+      const position = geoJsonPosition(coordinates, origin);
+      if (!position) continue;
+      if (isSounding && depth !== null) soundings.push({ id, depthM: depth, position });
+      else if (isHazard) hazards.push({ id, name, position, radiusNm: 0.08 });
+    } else if (geometryType === "MultiPoint" && isSounding && Array.isArray(coordinates)) {
+      coordinates.forEach((coordinate, part) => {
+        const position = geoJsonPosition(coordinate, origin);
+        if (position && depth !== null) soundings.push({ id: id + "-" + part, depthM: depth, position });
+      });
+    }
+    featureCount += 1;
+  }
+
+  if (!featureCount || (!areas.length && !hazards.length && !contours.length && !soundings.length)) {
+    throw new Error("В GeoJSON не найдены поддерживаемые объекты карты");
+  }
+  return { name: chartName, areas, hazards, contours, soundings, featureCount };
+}
