@@ -39,6 +39,11 @@ export interface ColregEnvironment {
   ownInshoreTrafficZone?: boolean;
   targetFollowingTrafficLane?: boolean;
   targetCanOnlyNavigateChannel?: boolean;
+  targetWindwardOfOwn?: boolean | null;
+  ownOvertakingNotClear?: boolean;
+  targetOvertakingNotClear?: boolean;
+  bearingHistoryDeg?: number[];
+  rangeHistoryNm?: number[];
   windDirectionKnown?: boolean;
   riskDcpaNm?: number;
 }
@@ -65,6 +70,9 @@ export interface ColregAssessment {
   dcpaNm: number | null;
   tcpaMin: number | null;
   collisionRisk: "risk" | "no-immediate-risk" | "undetermined";
+  bearingTrend: "stable" | "changing" | "insufficient";
+  rangeTrend: "decreasing" | "increasing" | "stable" | "insufficient";
+  rule7RiskIndication: boolean;
   applicableRules: ColregRuleDuty[];
   ownLightGuidance: ReturnType<typeof getVesselLightGuidance>;
   targetLightGuidance: ReturnType<typeof getVesselLightGuidance>;
@@ -154,6 +162,28 @@ function isAbaftBeam(relativeBearing: number): boolean {
 
 function isForwardSector(relativeBearing: number): boolean {
   return relativeBearing < 112.5 || relativeBearing > 247.5;
+}
+
+function assessRadarTrend(bearings: number[] | undefined, ranges: number[] | undefined): {
+  bearingTrend: "stable" | "changing" | "insufficient";
+  rangeTrend: "decreasing" | "increasing" | "stable" | "insufficient";
+  rule7RiskIndication: boolean;
+} {
+  if (!bearings || !ranges || bearings.length < 3 || ranges.length < 3) {
+    return { bearingTrend: "insufficient", rangeTrend: "insufficient", rule7RiskIndication: false };
+  }
+  const count = Math.min(bearings.length, ranges.length, 8);
+  const b = bearings.slice(-count);
+  const r = ranges.slice(-count);
+  if (![...b, ...r].every(Number.isFinite) || r.some((value) => value < 0)) {
+    throw new RangeError("Radar bearing/range history must contain finite values.");
+  }
+  const deltas = b.slice(1).map((value) => Math.abs(signedAngle(value - b[0])));
+  const bearingStable = deltas.every((delta) => delta <= 2.5);
+  const rangeDelta = r[r.length - 1] - r[0];
+  const rangeTrend = rangeDelta < -0.01 ? "decreasing" : rangeDelta > 0.01 ? "increasing" : "stable";
+  const bearingTrend = bearingStable ? "stable" : "changing";
+  return { bearingTrend, rangeTrend, rule7RiskIndication: bearingStable && rangeTrend === "decreasing" };
 }
 
 function normalizeProfile(profile: Partial<ColregVesselProfile> | undefined): ColregVesselProfile {
@@ -258,7 +288,8 @@ export function assessColregEncounter(
   const collisionRisk: ColregAssessment["collisionRisk"] = !cpa || cpa.tcpaMin <= 0
     ? "undetermined"
     : cpa.dcpaNm <= riskLimit ? "risk" : "no-immediate-risk";
-  const hasRisk = collisionRisk === "risk";
+  const radarTrend = assessRadarTrend(environment.bearingHistoryDeg, environment.rangeHistoryNm);
+  const hasRisk = collisionRisk === "risk" || radarTrend.rule7RiskIndication;
 
   const applicableRules = [...generalDuties];
   let encounter: EncounterType = "uncertain";
@@ -347,7 +378,7 @@ export function assessColregEncounter(
         ownShipDuty = ownProfile.windward
           ? "На одном галсе наветренное судно должно держаться в стороне от подветренного."
           : "Подветренное судно сохраняет курс и скорость; контролируйте обстановку.";
-      } else if (ownProfile.tack === "port" && targetProfile.tack === "unknown") {
+      } else if (ownProfile.tack === "port" && targetProfile.tack === "unknown" && environment.targetWindwardOfOwn === true) {
         ownShipDuty = "Вы не можете определить галс другого парусного судна, находясь на левом галсе. По правилу 12(c) держитесь в стороне от него.";
         responsibility = "give-way";
       } else {
@@ -356,8 +387,10 @@ export function assessColregEncounter(
       }
       applicableRules.push({ rule: 12, title: "Парусные суда", duty: ownShipDuty, status: "applies" });
     } else {
-      const ownOvertaking = ownProfile.underway && targetProfile.underway && isAbaftBeam(targetRelativeBearing) && closing > 0.05;
-      const targetOvertaking = ownProfile.underway && targetProfile.underway && isAbaftBeam(ownRelativeBearing) && closing > 0.05;
+      const ownOvertaking = environment.ownOvertakingNotClear === true ||
+        (ownProfile.underway && targetProfile.underway && isAbaftBeam(targetRelativeBearing) && closing > 0.05);
+      const targetOvertaking = environment.targetOvertakingNotClear === true ||
+        (ownProfile.underway && targetProfile.underway && isAbaftBeam(ownRelativeBearing) && closing > 0.05);
       if (ownOvertaking) {
         encounter = "overtaking-own";
         primaryRule = 13;
@@ -450,6 +483,7 @@ export function assessColregEncounter(
     "CPA/TCPA предполагает постоянство курсов и скоростей. Манёвры, дрейф, ветер, течение, мелководье и гидродинамическое взаимодействие не моделируются.",
     "Правила 9 и 10 требуют реальной карты, геометрии фарватера/TSS и местных правил; интерфейс учитывает только заданный пользователем факт нахождения в соответствующей зоне.",
     "Порог DCPA — учебная настройка, а не универсальная безопасная дистанция или норматив МППСС-72.",
+    "Признак Rule 7 по постоянному пеленгу и уменьшающейся дистанции — упрощённая проверка последних радиолокационных измерений, а не доказательство риска и не замена систематической прокладки.",
     "При сомнении, неполных данных или особых обстоятельствах нельзя полагаться на автоматическую классификацию; действует ответственность по правилу 2.",
   ];
 
@@ -468,6 +502,9 @@ export function assessColregEncounter(
     dcpaNm: cpa?.dcpaNm ?? null,
     tcpaMin: cpa?.tcpaMin ?? null,
     collisionRisk,
+    bearingTrend: radarTrend.bearingTrend,
+    rangeTrend: radarTrend.rangeTrend,
+    rule7RiskIndication: radarTrend.rule7RiskIndication,
     applicableRules,
     ownLightGuidance,
     targetLightGuidance,
