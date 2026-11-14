@@ -26,9 +26,29 @@ export type ArpaTrackSet = Record<string, ArpaTrack>;
 
 const MAX_MEASUREMENTS = 8;
 
+/** Three missed 2.5-second sweeps in the standard radar configuration. */
+export const DEFAULT_ARPA_LOST_AFTER_SECONDS = 7.5;
+
+export interface ArpaAlertConfig {
+  minimumDcpaNm: number;
+  maximumTcpaMinutes: number;
+}
+
+export const DEFAULT_ARPA_ALERT_CONFIG: ArpaAlertConfig = {
+  minimumDcpaNm: 0.5,
+  maximumTcpaMinutes: 15,
+};
+
 function validateTime(timeSeconds: number) {
   if (!Number.isFinite(timeSeconds) || timeSeconds < 0) {
     throw new RangeError("ARPA time must be finite and non-negative.");
+  }
+}
+
+function validateAlertConfig(config: ArpaAlertConfig) {
+  if (!Number.isFinite(config.minimumDcpaNm) || config.minimumDcpaNm < 0 ||
+      !Number.isFinite(config.maximumTcpaMinutes) || config.maximumTcpaMinutes <= 0) {
+    throw new RangeError("ARPA alert thresholds must be finite and non-negative (TCPA must be positive).");
   }
 }
 
@@ -72,14 +92,16 @@ function estimateVelocity(samples: readonly ArpaMeasurement[]) {
 }
 
 /**
- * Updates acquired tracks only from completed radar-sweep measurements.
- * Scenario truth course/speed are never read by the tracker.
+ * Updates tracks only from completed radar-sweep measurements.
+ * Lost is declared after the configured number of missed sweeps. If a lost
+ * contact reappears under the same sensor ID, its old history is discarded
+ * and acquisition restarts from the new measured position.
  */
 export function updateArpaTracks(
   tracks: ArpaTrackSet,
   scanMeasurements: readonly Pick<RadarMeasurement, "id" | "xNm" | "yNm">[],
   timeSeconds: number,
-  lostAfterSeconds = 10,
+  lostAfterSeconds = DEFAULT_ARPA_LOST_AFTER_SECONDS,
 ): ArpaTrackSet {
   validateTime(timeSeconds);
   if (!Number.isFinite(lostAfterSeconds) || lostAfterSeconds <= 0) {
@@ -88,13 +110,18 @@ export function updateArpaTracks(
 
   let nextTracks = tracks;
   for (const [id, track] of Object.entries(tracks)) {
-    if (track.status === "lost") continue;
     const target = scanMeasurements.find((item) => item.id === id);
     if (!target) {
-      if (timeSeconds - track.lastMeasurementSeconds > lostAfterSeconds) {
+      if (track.status !== "lost" && timeSeconds - track.lastMeasurementSeconds >= lostAfterSeconds - 1e-9) {
         if (nextTracks === tracks) nextTracks = { ...tracks };
         nextTracks[id] = { ...track, status: "lost" };
       }
+      continue;
+    }
+
+    if (track.status === "lost") {
+      if (nextTracks === tracks) nextTracks = { ...tracks };
+      nextTracks[id] = acquireArpaTarget({ id, xNm: target.xNm, yNm: target.yNm }, timeSeconds);
       continue;
     }
     if (timeSeconds <= track.lastMeasurementSeconds + 1e-9) continue;
@@ -143,7 +170,7 @@ export function calculateArpaSolution(
   const north = target.yNm - own.yNm;
   const rangeNm = Math.hypot(east, north);
   const bearingDeg = (Math.atan2(east, north) * 180 / Math.PI + 360) % 360;
-  if (track.targetVelocityEastKn === null || track.targetVelocityNorthKn === null || rangeNm < 1e-9) {
+  if (track.status !== "tracking" || track.targetVelocityEastKn === null || track.targetVelocityNorthKn === null || rangeNm < 1e-9) {
     return { rangeNm, bearingDeg, tcpaMin: null, dcpaNm: null };
   }
   const ownVelocity = velocityFromCourse(own.courseDeg, own.speedKn);
@@ -160,4 +187,18 @@ export function calculateArpaSolution(
     tcpaMin: timeHours * 60,
     dcpaNm: Math.hypot(cpaEast, cpaNorth),
   };
+}
+
+/** Training alert only; thresholds are configurable and are not COLREG limits. */
+export function isArpaCloseApproachAlert(
+  track: ArpaTrack,
+  solution: ArpaSolution,
+  config: ArpaAlertConfig = DEFAULT_ARPA_ALERT_CONFIG,
+): boolean {
+  validateAlertConfig(config);
+  return track.status === "tracking" &&
+    solution.tcpaMin !== null && solution.dcpaNm !== null &&
+    solution.tcpaMin >= 0 &&
+    solution.tcpaMin <= config.maximumTcpaMinutes &&
+    solution.dcpaNm < config.minimumDcpaNm;
 }
