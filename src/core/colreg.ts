@@ -375,10 +375,15 @@ export function assessColregEncounter(
       addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });
     }
     if (environment.ownInshoreTrafficZone) {
+      const inshoreExceptionCategory = (ownProfile.lengthM ?? 50) < 20 ||
+        (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) ||
+        (ownProfile.kind === "fishing" && ownProfile.engagedInFishing);
       addDuty(applicableRules, {
         rule: 10,
         title: "Прибрежная зона движения",
-        duty: "Использование inshore traffic zone ограничено категориями судов и обстоятельствами, указанными в правиле 10; проверьте право нахождения в этой зоне.",
+        duty: inshoreExceptionCategory
+          ? "Ваше судно относится к категории, которой правило 10 допускает использование inshore traffic zone. Учитывайте направление движения и не затрудняйте суда в полосе TSS."
+          : "Не используйте inshore traffic zone, если можете безопасно использовать соответствующую полосу TSS, кроме предусмотренных правилом 10 исключений (например, следование в/из порта, избежание непосредственной опасности или пересечение зоны).",
         status: "conditional",
       });
     }
