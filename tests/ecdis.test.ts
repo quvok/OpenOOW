@@ -104,51 +104,6 @@ describe("ECDIS navigation calculations", () => {
 });
 
 
-  it("preserves polygon holes and excludes them from depth coverage", () => {
-    const polygon = (ring: Array<[number, number]>) => ring.map(([east, north]) => geo(east, north));
-    const imported = importGeoJsonChart({
-      type: "FeatureCollection",
-      features: [{
-        type: "Feature", id: "depth-with-hole",
-        properties: { layer: "DEPARE", DRVAL1: 18 },
-        geometry: { type: "Polygon", coordinates: [
-          polygon([[-2, -2], [2, -2], [2, 2], [-2, 2], [-2, -2]]),
-          polygon([[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5], [-0.5, -0.5]]),
-        ] },
-      }],
-    }, origin);
-    expect(imported.areas[0].holes).toHaveLength(1);
-    expect(chartedDepthAt({ eastNm: 1, northNm: 1 }, imported.areas)).toBe(18);
-    expect(chartedDepthAt({ eastNm: 0, northNm: 0 }, imported.areas)).toBeNull();
-    const routeAcrossHole = assessRoute([
-      { id: "a", name: "A", eastNm: -1, northNm: 0 },
-      { id: "b", name: "B", eastNm: 1, northNm: 0 },
-    ], imported.areas, [], 10, 0.02);
-    expect(routeAcrossHole.safe).toBe(false);
-    expect(routeAcrossHole.unchartedIntersections.length).toBeGreaterThan(0);
-  });
-
-  it("preserves holes in MultiPolygon parts independently", () => {
-    const polygon = (ring: Array<[number, number]>) => ring.map(([east, north]) => geo(east, north));
-    const imported = importGeoJsonChart({
-      type: "FeatureCollection",
-      features: [{
-        type: "Feature", id: "multi",
-        properties: { layer: "LNDARE" },
-        geometry: { type: "MultiPolygon", coordinates: [
-          [
-            polygon([[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]),
-            polygon([[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]),
-          ],
-          [polygon([[3, 0], [5, 0], [5, 2], [3, 2], [3, 0]])],
-        ] },
-      }],
-    }, origin);
-    expect(imported.areas).toHaveLength(2);
-    expect(imported.areas[0].holes).toHaveLength(1);
-    expect(imported.areas[1].holes).toBeUndefined();
-    expect(chartedDepthAt({ eastNm: 1, northNm: 1 }, imported.areas)).toBeNull();
-  });
 
 describe("ECDIS active route monitoring", () => {
   it("calculates XTE and DTW against the selected active leg, not the nearest route leg", () => {
@@ -230,5 +185,51 @@ describe("ECDIS GeoJSON chart ingestion", () => {
   it("rejects non-FeatureCollection input and unsupported empty charts", () => {
     expect(() => importGeoJsonChart({ type: "Feature", geometry: null }, origin)).toThrow("FeatureCollection");
     expect(() => importGeoJsonChart({ type: "FeatureCollection", features: [] }, origin)).toThrow("поддерживаемые объекты");
+  });
+
+  it("preserves polygon holes and excludes them from depth coverage", () => {
+    const polygon = (ring: Array<[number, number]>) => ring.map(([east, north]) => geo(east, north));
+    const imported = importGeoJsonChart({
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature", id: "depth-with-hole",
+        properties: { layer: "DEPARE", DRVAL1: 18 },
+        geometry: { type: "Polygon", coordinates: [
+          polygon([[-2, -2], [2, -2], [2, 2], [-2, 2], [-2, -2]]),
+          polygon([[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5], [-0.5, -0.5]]),
+        ] },
+      }],
+    }, origin);
+    expect(imported.areas[0].holes).toHaveLength(1);
+    expect(chartedDepthAt({ eastNm: 1, northNm: 1 }, imported.areas)).toBe(18);
+    expect(chartedDepthAt({ eastNm: 0, northNm: 0 }, imported.areas)).toBeNull();
+    const routeAcrossHole = assessRoute([
+      { id: "a", name: "A", eastNm: -1, northNm: 0 },
+      { id: "b", name: "B", eastNm: 1, northNm: 0 },
+    ], imported.areas, [], 10, 0.02);
+    expect(routeAcrossHole.safe).toBe(false);
+    expect(routeAcrossHole.unchartedIntersections.length).toBeGreaterThan(0);
+  });
+
+  it("preserves holes in MultiPolygon parts independently", () => {
+    const polygon = (ring: Array<[number, number]>) => ring.map(([east, north]) => geo(east, north));
+    const imported = importGeoJsonChart({
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature", id: "multi",
+        properties: { layer: "LNDARE" },
+        geometry: { type: "MultiPolygon", coordinates: [
+          [
+            polygon([[0, 0], [2, 0], [2, 2], [0, 2], [0, 0]]),
+            polygon([[0.5, 0.5], [1.5, 0.5], [1.5, 1.5], [0.5, 1.5], [0.5, 0.5]]),
+          ],
+          [polygon([[3, 0], [5, 0], [5, 2], [3, 2], [3, 0]])],
+        ] },
+      }],
+    }, origin);
+    expect(imported.areas).toHaveLength(2);
+    expect(imported.areas[0].holes).toHaveLength(1);
+    expect(imported.areas[1].holes).toBeUndefined();
+    expect(chartedDepthAt({ eastNm: 1, northNm: 1 }, imported.areas)).toBeNull();
   });
 });
