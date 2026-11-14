@@ -342,3 +342,31 @@ export function isArpaCloseApproachAlert(
     solution.tcpaMin <= config.maximumTcpaMinutes &&
     solution.dcpaNm < config.minimumDcpaNm;
 }
+
+
+export interface BowCrossingSolution {
+  bcrNm: number | null;
+  bctMin: number | null;
+}
+
+/** Geometric prediction of the target crossing the own-ship heading line. */
+export function calculateBowCrossing(
+  track: ArpaTrack,
+  target: Pick<VesselState, "xNm" | "yNm">,
+  own: Pick<VesselState, "xNm" | "yNm" | "courseDeg" | "speedKn">,
+): BowCrossingSolution {
+  if (track.status !== "tracking" || track.targetVelocityEastKn === null || track.targetVelocityNorthKn === null) return { bcrNm: null, bctMin: null };
+  const ownVelocity = velocityFromCourse(own.courseDeg, own.speedKn);
+  const relativeEast = track.targetVelocityEastKn - ownVelocity.eastKn;
+  const relativeNorth = track.targetVelocityNorthKn - ownVelocity.northKn;
+  const heading = own.courseDeg * Math.PI / 180;
+  const rightEast = Math.cos(heading), rightNorth = -Math.sin(heading);
+  const alongEast = Math.sin(heading), alongNorth = Math.cos(heading);
+  const east = target.xNm - own.xNm, north = target.yNm - own.yNm;
+  const crossTrack = east * rightEast + north * rightNorth;
+  const crossTrackRate = relativeEast * rightEast + relativeNorth * rightNorth;
+  if (Math.abs(crossTrackRate) < 1e-9) return { bcrNm: null, bctMin: null };
+  const timeHours = -crossTrack / crossTrackRate;
+  const bcrNm = (east + relativeEast * timeHours) * alongEast + (north + relativeNorth * timeHours) * alongNorth;
+  return { bcrNm, bctMin: timeHours * 60 };
+}
