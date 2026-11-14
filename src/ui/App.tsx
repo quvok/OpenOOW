@@ -12,6 +12,7 @@ import { assessColregEncounter, evaluateColregManeuver, type Tack } from "../cor
 import type { ColregVesselKind } from "../core/colregSignals";
 import { getLightVisibilityMinimums, getRestrictedVisibilitySignal, getSoundSignals, LIGHT_DEFINITIONS } from "../core/colregSignals";
 import { COLREG_RULES } from "../core/colregRules";
+import EcdisModule from "./EcdisModule";
 
 const STEP_SECONDS = 0.1;
 const RADAR_RANGE_NM = 3;
@@ -67,6 +68,7 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState<EncounterScenario>(ENCOUNTER_SCENARIOS[0]);
   const [ship, setShip] = useState<ShipDynamicsState>(() => createScenarioShipState(ENCOUNTER_SCENARIOS[0]));
   const [running, setRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<"radar" | "ecdis">("radar");
   const [eblBearingDeg, setEblBearingDeg] = useState(0);
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
@@ -360,18 +362,21 @@ export default function App() {
     <section className="workspace">
       <header className="topbar transas-topbar">
         <div className="equipment-brand"><span className="equipment-mark">O</span><div><b>OPENOOW</b><small>RADAR / ARPA SIMULATOR</small></div></div>
-        <div className="equipment-title"><strong>RADAR</strong><span>{activeScenario.title}</span></div>
-        <div className="header-actions"><button type="button" className="header-key" onClick={() => setScenarioDialogOpen(true)}>СЦЕНАРИЙ</button><div className={running ? "status live" : "status"}><i/>{running ? "SIM RUNNING" : "SIM PAUSED"}</div></div>
+        <div className="equipment-title"><strong>{activeTab === "radar" ? "RADAR / ARPA" : "ECDIS"}</strong><span>{activeTab === "radar" ? activeScenario.title : "ЭЛЕКТРОННАЯ КАРТА И ПЛАНИРОВАНИЕ МАРШРУТА"}</span></div>
+        <div className="header-actions">{activeTab === "radar" && <button type="button" className="header-key" onClick={() => setScenarioDialogOpen(true)}>СЦЕНАРИЙ</button>}<div className={running ? "status live" : "status"}><i/>{running ? "SIM RUNNING" : "SIM PAUSED"}</div></div>
       </header>
       <div className="instrument-strip">
         <span><small>HDG</small><b>{ship.headingDeg.toFixed(0)}°T</b></span>
         <span><small>SPD</small><b>{ship.speedKn.toFixed(1)} kn</b></span>
         <span><small>ROT</small><b>{(ship.yawRateDegPerSec*60).toFixed(1)}°/min</b></span>
-        <span><small>RANGE</small><b>{RADAR_RANGE_NM.toFixed(1)} NM</b></span>
-        <span><small>SCAN</small><b>2.5 s</b></span>
+        {activeTab === "radar" ? <><span><small>RANGE</small><b>{RADAR_RANGE_NM.toFixed(1)} NM</b></span><span><small>SCAN</small><b>2.5 s</b></span></> : <><span><small>POSITION E</small><b>{ship.eastNm.toFixed(2)} NM</b></span><span><small>POSITION N</small><b>{ship.northNm.toFixed(2)} NM</b></span></>}
         <span><small>TIME</small><b>{formatTime(ship.elapsedSeconds)}</b></span>
       </div>
-      {scenarioDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setScenarioDialogOpen(false); }}>
+      <nav className="module-tabs" aria-label="Навигационные модули">
+        <button type="button" className={activeTab === "radar" ? "module-tab active" : "module-tab"} onClick={() => setActiveTab("radar")}><Target size={14}/> RADAR / ARPA</button>
+        <button type="button" className={activeTab === "ecdis" ? "module-tab active" : "module-tab"} onClick={() => setActiveTab("ecdis")}><Anchor size={14}/> ECDIS</button>
+      </nav>
+      {activeTab === "radar" ? <>{scenarioDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setScenarioDialogOpen(false); }}>
         <section className="scenario-dialog" role="dialog" aria-modal="true" aria-labelledby="scenario-dialog-title">
           <div className="dialog-heading"><div><span className="eyebrow">TRAINING SCENARIOS</span><h2 id="scenario-dialog-title">Выбор учебной ситуации</h2></div><button type="button" className="dialog-close" onClick={() => setScenarioDialogOpen(false)} aria-label="Закрыть">×</button></div>
           <label className="dialog-label" htmlFor="scenario-select">Сценарий</label>
@@ -726,6 +731,7 @@ export default function App() {
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
       </section></details>
       <div className="notice"><b>Ограничение учебной модели:</b> искусственные шумы и пропуски отметок отключены; обзор обновляется каждые 2,5 секунды. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след строится только по реально полученным радиолокационным отметкам; при пропуске обзора новая точка не добавляется. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
+      </> : <EcdisModule ship={ship} targets={targets}/>}
     </section>
   </main>;
 }
