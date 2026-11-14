@@ -85,11 +85,12 @@ export function calculateEnvironmentalMotion(
 
   const relativeWindFrom = ((environment.windFromDeg - headingDeg + 540) % 360) - 180;
   const windFactor = Math.min(environment.windSpeedKn / parameters.referenceWindSpeedKn, 2);
-  const leewayDeg = clamp(
+  const rawLeewayDeg = clamp(
     -parameters.leewayAtReferenceWindDeg * windFactor * Math.sin(relativeWindFrom * Math.PI / 180),
     -12,
     12,
   );
+  const leewayDeg = Math.abs(rawLeewayDeg) < 1e-12 ? 0 : rawLeewayDeg;
   const waveSpeedFactor = clamp(
     1 - environment.significantWaveHeightM * parameters.waveSpeedLossPerMetre,
     0.7,
