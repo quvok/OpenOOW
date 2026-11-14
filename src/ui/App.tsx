@@ -222,9 +222,15 @@ export default function App() {
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
   const selectedMeasurement = radarMeasurements.find((item) => item.id === selectedRadarTargetId) ?? null;
-  const selectedColregTarget = targets.find((target) => target.id === selectedRadarTargetId) ?? null;
-  const colregAssessment = selectedColregTarget ? assessColregEncounter(ownVessel, selectedColregTarget, { restrictedVisibility: activeScenario.visibilityNm <= 2, riskDcpaNm: alertDcpaNm }) : null;
   const selectedTrack = selectedRadarTargetId ? Object.values(arpaTracks).find((track) => track.associatedRadarId === selectedRadarTargetId) ?? arpaTracks[selectedRadarTargetId] : undefined;
+  const latestColregMeasurement = selectedTrack?.measurements[selectedTrack.measurements.length - 1];
+  const selectedColregTarget: VesselState | null = selectedTrack?.status === "tracking" &&
+    selectedTrack.estimatedCourseDeg !== null && selectedTrack.estimatedSpeedKn !== null && latestColregMeasurement
+    ? { id: selectedTrack.targetId, xNm: latestColregMeasurement.xNm, yNm: latestColregMeasurement.yNm, courseDeg: selectedTrack.estimatedCourseDeg, speedKn: selectedTrack.estimatedSpeedKn }
+    : null;
+  const colregAssessment = selectedColregTarget
+    ? assessColregEncounter(ownVessel, selectedColregTarget, { restrictedVisibility: activeScenario.visibilityNm <= 2, riskDcpaNm: alertDcpaNm })
+    : null;
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
   return <main className="app-shell">
@@ -407,8 +413,8 @@ export default function App() {
                 <div><small>TCPA</small><b>{colregAssessment.tcpaMin === null ? "—" : formatMinutes(colregAssessment.tcpaMin)}</b></div>
               </div>
               <details className="colreg-limitations"><summary>Ограничения автоматической оценки</summary><ul>{colregAssessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
-            </> : <p className="cpa-note compact-note">Выберите радиолокационную отметку на PPI. Модуль покажет геометрически вероятную ситуацию и возможное правило-кандидат.</p>}
-            <p className="cpa-note compact-note">Учебная подсказка, не юридическое заключение и не команда к манёвру.</p>
+            </> : <p className="cpa-note compact-note">Выберите отметку на PPI, захватите её в ARPA и дождитесь статуса TRACK. Для классификации используются измеренное положение и оценённые ARPA курс/скорость, а не скрытые параметры сценария.</p>}
+            <p className="cpa-note compact-note">Учебная подсказка. Для правила 19 сценарий ограниченной видимости условно предполагает, что суда не находятся в виду друг друга. Это не юридическое заключение и не команда к манёвру.</p>
           </section>
           <section className="panel console-panel trial-quick-panel">
             <div className="panel-heading"><div><span className="eyebrow">TRIAL MANOEUVRE</span><h2>Пробный манёвр</h2></div></div>
