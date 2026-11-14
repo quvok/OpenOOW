@@ -26,7 +26,9 @@ describe("COLREG rule reference", () => {
   });
 
   it("provides manoeuvring, restricted-visibility and distress signal references", () => {
+    expect(getSoundSignals(33).length).toBeGreaterThan(0);
     expect(getSoundSignals(34).some((signal) => signal.pattern === "3 коротких")).toBe(true);
+    expect(getSoundSignals(34).some((signal) => signal.pattern.includes("проблеска"))).toBe(true);
     expect(getSoundSignals(35).length).toBeGreaterThan(0);
     expect(getSoundSignals(37).length).toBeGreaterThan(0);
   });
