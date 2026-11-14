@@ -67,3 +67,11 @@ All displayed values are training data derived from simulated radar measurements
 ## Automatic Trial Manoeuvre ROT (v0.23.6)
 
 The manual ROT input has been removed from both Trial Manoeuvre interfaces. ROT is now estimated from the current own-ship speed and the simulator's simplified ship model: reference speed, speed-squared rudder effectiveness, and maximum turn rate at hard-over rudder. The readout updates automatically as own-ship speed changes. It is a model estimate, not a value from a real vessel's manoeuvring booklet; at very low speed a 0.1°/min display floor is used to keep the trial solver numerically usable.
+
+
+## ECDIS chart and route safety improvements (v0.23.7)
+
+- The chart follows own ship while remaining North Up. Route points remain in the same local coordinate frame; chart clicks are converted from the moving viewport back to world coordinates.
+- Depth is reported as unknown outside explicit chart coverage; land is not reported as water depth.
+- Route assessment flags uncharted route segments as unsafe/unknown instead of assuming 40 m depth. The training chart includes a synthetic 40 m charted-water area with shallower patches overlaid.
+- These checks use a simplified synthetic chart and sampled route segments; they are not an ENC safety contour or a navigational safety guarantee.
