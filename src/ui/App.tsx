@@ -561,15 +561,8 @@ export default function App() {
             <div className="target-info-topline"><div><span className="eyebrow">ARPA / TARGET DATA</span><h2>Targets Information</h2></div><span className="target-source-indicator">● OWN ARPA</span></div>
             <div className="target-info-controls"><label>Приоритет <select aria-label="Приоритет источника"><option>ARPA</option></select></label><button type="button" className="target-info-association" title="Сопоставление AIS/ARPA появится после добавления потока AIS">Связь AIS/ARPA</button><label className="target-filter-label">Фильтр AIS <select disabled aria-label="Фильтр AIS"><option>ВЫКЛ. · НЕТ ИСТОЧНИКА AIS</option></select></label></div>
             <div className="target-info-titlebar"><span>ИНФОРМАЦИЯ О ЦЕЛЯХ</span><button type="button" className="target-info-menu-trigger" aria-label="Открыть список приборных блоков" aria-expanded={targetInfoMenuOpen} onClick={() => setTargetInfoMenuOpen((open) => !open)}>{targetInfoMenuOpen ? "▲" : "▼"}</button><small>{arpaInfoRows.length} СОПРОВОЖДАЕМЫХ</small></div>
-            {targetInfoMenuOpen && <nav className="target-info-menu target-block-menu" aria-label="Переход между блоками">
-              <a href="#panel-arpa-display" onClick={()=>setTargetInfoMenuOpen(false)}>ARPA DISPLAY · Векторы целей</a>
-              <a href="#panel-arpa-targets" onClick={()=>setTargetInfoMenuOpen(false)}>ARPA TARGETS · Сопровождаемые цели</a>
-              <a href="#panel-colreg-assessment" onClick={()=>setTargetInfoMenuOpen(false)}>COLREG ASSESSMENT · Оценка МППСС-72</a>
-              <a href="#panel-autopilot" onClick={()=>setTargetInfoMenuOpen(false)}>АВТОПИЛОТ · Удержание курса</a>
-            </nav>}
-            <div className="target-info-foot"><span>CPA/TCPA · BCR/BCT</span><span>ПЕЛЕНГ: ИСТИННЫЙ</span><span>ИСТОЧНИК: ИЗМЕРЕНИЯ РЛС</span></div>
-          </section>
-          <section className="panel console-panel">
+             {targetInfoMenuOpen && <div className="target-info-expanded-blocks">
+<section className="panel console-panel">
             <div className="panel-heading"><div><span className="eyebrow">ARPA DISPLAY</span><h2>Векторы целей</h2></div></div>
             <div className="console-field"><span>Режим</span><div className="console-toggle"><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>TRUE</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>REL</button></div></div>
             <div className="console-field"><label htmlFor="vector-time">Длина вектора</label><strong>{vectorMinutes} MIN</strong></div>
@@ -724,6 +717,9 @@ export default function App() {
               <span>{autopilot.engaged ? "Руль управляется автопилотом" : "Ручное управление"}</span>
             </div>
             <p className="cpa-note compact-note">Автопилот удерживает только заданный курс. Маршрутное управление, адаптивная модель перекладки и отказоустойчивость рулевого привода пока не моделируются.</p>
+          </section>
+            </div>}
+           <div className="target-info-foot"><span>CPA/TCPA · BCR/BCT</span><span>ПЕЛЕНГ: ИСТИННЫЙ</span><span>ИСТОЧНИК: ИЗМЕРЕНИЯ РЛС</span></div>
           </section>
           <section className="panel">
             <div className="panel-heading"><div><span className="eyebrow">МОСТИК</span><h2>Органы управления</h2></div></div>
