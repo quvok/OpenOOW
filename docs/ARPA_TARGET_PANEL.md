@@ -40,15 +40,25 @@ The dynamic trial prediction is calculated independently of live ship state:
 This is a deterministic educational model. It does not reproduce a specific manufacturer algorithm, vessel-specific manoeuvring booklet, rudder response, drift, current, wind, or turning-circle model. Trial results are not for real navigation.
 
 
-## Unified Targets Information panel (v0.23.1)
+## Targets Information selector (v0.23.5)
 
-The title-bar arrow expands or collapses one integrated information area. It does not navigate between separate pages. The expanded area stacks all target-data blocks in one continuous panel:
-- Target overview and multi-target table.
-- Selected-target CPA/TCPA and current bearing/range.
-- BCR/BCT.
-- Past measured positions.
-- ARPA tracking status for every acquired target.
-- Dynamic Trial Manoeuvre settings and predicted CPA/TCPA.
-- AIS availability status.
+The title-bar arrow opens a menu. Each menu choice displays one instrument block at a time; no separate block is inserted outside this selector.
 
-Selecting a target in the overview or tracking list updates the selected-target-dependent blocks together. The panel uses Russian labels; standard maritime abbreviations and units are retained. All blocks are visible in the same expanded area.
+Available pages:
+- Target Information: Multiple overview and an individual target readout with source/status, range, true bearing, DCPA, TCPA, estimated COG/SOG, BCR/BCT, scan count, last scan time, and target-swap count.
+- CPA/TCPA: current closest-approach solution for the selected ARPA track.
+- BCR/BCT: bow-crossing prediction.
+- Past Positions: measured positions retained by the selected ARPA track.
+- ARPA Tracking: acquisition/tracking/lost state and scan count.
+- Trial Manoeuvre: dynamic own-ship trial settings and predicted DCPA/TCPA.
+- COLREG Assessment, ARPA Targets, ARPA Display, and Autopilot remain available in the same menu.
+
+## Acquisition and tracking
+
+Manual acquisition starts in ACQ with the first measured radar position. The track remains ACQ through the first two observations and enters TRACK after the third valid radar observation, when a velocity estimate can be formed from a short measured history. The position history is bounded to the newest eight samples, while the total observation count continues increasing. A track becomes LOST after three missed 2.5-second radar sweeps (7.5 seconds). Reacquisition by the same echo ID starts a fresh ACQ history; stale velocity is not carried over.
+
+The association model uses predicted target position and one-to-one global assignment to avoid assigning one radar echo to multiple active tracks. Target Swap is reported when the associated echo identity changes. This remains a deterministic educational association model and is not a certified ARPA tracker.
+
+## Limitations
+
+All displayed values are training data derived from simulated radar measurements. CPA/TCPA assumes constant current velocities; Trial Manoeuvre uses a separate simplified turn-rate/acceleration model. Wind, current, leeway, sensor fusion, AIS, real radar clutter, sea/rain clutter controls, and manufacturer-specific tracking filters are not represented. The simulator is not certified and must not be used for real navigation.
