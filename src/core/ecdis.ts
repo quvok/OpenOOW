@@ -21,6 +21,8 @@ export interface ChartArea {
   kind: "land" | "shallow" | "charted";
   depthM?: number;
   polygon: LocalPosition[];
+  /** Interior rings (holes) from GeoJSON Polygon geometry. */
+  holes?: LocalPosition[][];
 }
 
 export interface ChartHazard {
@@ -146,10 +148,15 @@ export function pointInPolygon(point: LocalPosition, polygon: LocalPosition[]): 
   return inside;
 }
 
+function pointInChartArea(point: LocalPosition, area: ChartArea): boolean {
+  return pointInPolygon(point, area.polygon) &&
+    !(area.holes ?? []).some((ring) => pointInPolygon(point, ring));
+}
+
 export function chartedDepthAt(position: LocalPosition, areas: ChartArea[], defaultDepthM: number | null = null): number | null {
-  if (areas.some((area) => area.kind === "land" && pointInPolygon(position, area.polygon))) return null;
+  if (areas.some((area) => area.kind === "land" && pointInChartArea(position, area))) return null;
   const containing = areas.filter((area) =>
-    (area.kind === "charted" || area.kind === "shallow") && pointInPolygon(position, area.polygon));
+    (area.kind === "charted" || area.kind === "shallow") && pointInChartArea(position, area));
   if (!containing.length) return defaultDepthM;
   return containing.reduce((depth, area) => Math.min(depth, area.depthM ?? defaultDepthM ?? 40), Infinity);
 }
@@ -178,7 +185,7 @@ export function assessRoute(
       let isLand = false;
       let hasDepthCoverage = false;
       for (const area of areas) {
-        if (!pointInPolygon(point, area.polygon)) continue;
+        if (!pointInChartArea(point, area)) continue;
         if (area.kind === "land") {
           landIntersections.add(area.name);
           isLand = true;
@@ -434,7 +441,11 @@ export function importGeoJsonChart(input: unknown, origin: GeoOrigin, chartName 
     if (!Array.isArray(coordinates) || !Array.isArray(coordinates[0])) return;
     const outer = geoJsonLine(coordinates[0], origin);
     if (outer.length < 3) return;
-    areas.push({ id, name, kind, ...(depthM === undefined ? {} : { depthM }), polygon: outer });
+    const holes = coordinates.slice(1)
+      .filter((ring): ring is unknown[] => Array.isArray(ring))
+      .map((ring) => geoJsonLine(ring, origin))
+      .filter((ring) => ring.length >= 3);
+    areas.push({ id, name, kind, ...(depthM === undefined ? {} : { depthM }), polygon: outer, ...(holes.length ? { holes } : {}) });
   };
 
   for (let index = 0; index < root.features.length; index += 1) {
