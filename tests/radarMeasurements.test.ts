@@ -1,42 +1,38 @@
 import { describe, expect, it } from "vitest";
 import type { VesselState } from "../src/core/navigation";
-import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarMeasurementConfig } from "../src/core/radarMeasurements";
+import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts } from "../src/core/radarMeasurements";
 
 const own: VesselState = { id: "OWN", xNm: 0, yNm: 0, courseDeg: 0, speedKn: 0 };
-const target: VesselState = { id: "T1", xNm: 0, yNm: 2, courseDeg: 180, speedKn: 5 };
+const targets: VesselState[] = [
+  { id: "T1", xNm: 0, yNm: 2, courseDeg: 180, speedKn: 5 },
+  { id: "T2", xNm: 1.5, yNm: 0, courseDeg: 270, speedKn: 4 },
+];
 
 describe("radar measurement model", () => {
-  it("measures range and true bearing in a documented East/North frame", () => {
-    const config = { ...DEFAULT_RADAR_CONFIG, rangeErrorNm: 0, bearingErrorDeg: 0, dropoutEveryScans: 0 };
-    const [measurement] = measureRadarContacts(own, [target], 2.5, 1, config);
-    expect(measurement.rangeNm).toBeCloseTo(2);
-    expect(measurement.bearingDeg).toBeCloseTo(0);
-    expect(measurement.xNm).toBeCloseTo(0);
-    expect(measurement.yNm).toBeCloseTo(2);
+  it("uses exact range and true bearing in clean-echo mode", () => {
+    const [north, east] = measureRadarContacts(own, targets, 2.5, 1);
+    expect(north.rangeNm).toBe(2);
+    expect(north.bearingDeg).toBe(0);
+    expect(north.xNm).toBe(0);
+    expect(north.yNm).toBe(2);
+    expect(east.rangeNm).toBe(1.5);
+    expect(east.bearingDeg).toBe(90);
   });
 
-  it("applies bounded deterministic range and bearing errors", () => {
-    const config: RadarMeasurementConfig = { ...DEFAULT_RADAR_CONFIG, dropoutEveryScans: 0 };
-    const eastTarget = { ...target, xNm: 2, yNm: 0 };
-    const first = measureRadarContacts(own, [eastTarget], 2.5, 4, config)[0];
-    const repeated = measureRadarContacts(own, [eastTarget], 2.5, 4, config)[0];
-    expect(repeated).toEqual(first);
-    expect(Math.abs(first.rangeNm - 2)).toBeLessThanOrEqual(config.rangeErrorNm);
-    expect(Math.abs(first.bearingDeg - 90)).toBeLessThanOrEqual(config.bearingErrorDeg);
+  it("has no artificial range error, bearing error, or deterministic dropouts by default", () => {
+    expect(DEFAULT_RADAR_CONFIG.rangeErrorNm).toBe(0);
+    expect(DEFAULT_RADAR_CONFIG.bearingErrorDeg).toBe(0);
+    expect(DEFAULT_RADAR_CONFIG.dropoutEveryScans).toBe(0);
+    for (let scan = 0; scan < 100; scan += 1) {
+      expect(measureRadarContacts(own, targets, scan * 2.5, scan)).toHaveLength(2);
+    }
   });
 
-  it("omits contacts outside the configured radar range", () => {
-    const config = { ...DEFAULT_RADAR_CONFIG, maximumRangeNm: 1, dropoutEveryScans: 0 };
-    expect(measureRadarContacts(own, [target], 2.5, 1, config)).toHaveLength(0);
-  });
-
-  it("produces deterministic periodic scan dropouts", () => {
-    const config = { ...DEFAULT_RADAR_CONFIG, rangeErrorNm: 0, bearingErrorDeg: 0, dropoutEveryScans: 5 };
-    const missed = Array.from({ length: 20 }, (_, scan) =>
-      measureRadarContacts(own, [target], scan * 2.5, scan, config).length === 0);
-    expect(missed.filter(Boolean).length).toBe(4);
-    expect(missed).toEqual(Array.from({ length: 20 }, (_, scan) =>
-      measureRadarContacts(own, [target], scan * 2.5, scan, config).length === 0));
+  it("still excludes contacts outside the configured radar range", () => {
+    expect(measureRadarContacts(own, targets, 2.5, 1, {
+      ...DEFAULT_RADAR_CONFIG,
+      maximumRangeNm: 1,
+    })).toHaveLength(0);
   });
 
   it("uses a fixed scan interval and rejects time reversal", () => {
