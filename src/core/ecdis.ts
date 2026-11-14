@@ -344,3 +344,12 @@ export function classifyDepth(
   if (depthM < settings.shallowContourM) return "shallow";
   return "deep";
 }
+
+
+export function fromGeographicPosition(position: GeoOrigin, origin: GeoOrigin): LocalPosition {
+  const northNm = (position.latitudeDeg - origin.latitudeDeg) * 60;
+  const meanLatitudeRad = ((position.latitudeDeg + origin.latitudeDeg) / 2) * DEG_TO_RAD;
+  const eastNm = normalizeLongitude(position.longitudeDeg - origin.longitudeDeg) * 60 *
+    Math.max(0.01, Math.cos(meanLatitudeRad));
+  return { eastNm, northNm };
+}
