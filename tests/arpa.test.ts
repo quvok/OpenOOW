@@ -9,6 +9,7 @@ import {
   updateArpaTracks,
   isArpaCloseApproachAlert,
   DEFAULT_ARPA_ALERT_CONFIG,
+  ARPA_MIN_MEASUREMENTS_FOR_TRACK,
   DEFAULT_ARPA_LOST_AFTER_SECONDS,
   DEFAULT_ARPA_ASSOCIATION_GATE_NM,
   type ArpaTrackSet,
@@ -42,6 +43,8 @@ describe("ARPA acquisition and tracking", () => {
   it("estimates a target from successive measured positions, not declared course/speed", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 2.5 }], 2.5);
+    expect(tracks.T1.status).toBe("acquiring");
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 5 }], 5);
     expect(tracks.T1.status).toBe("tracking");
     expect(tracks.T1.estimatedCourseDeg).toBeCloseTo(180);
     expect(tracks.T1.estimatedSpeedKn).toBeCloseTo(5);
@@ -57,8 +60,9 @@ describe("ARPA acquisition and tracking", () => {
   it("calculates CPA/TCPA from estimated target and own-ship velocities", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 2.5 }], 2.5);
-    const solution = calculateArpaSolution(tracks.T1, { xNm: 0, yNm: 2 - 5 / 3600 * 2.5 }, { ...own, yNm: 10 * 2.5 / 3600 });
-    expect(solution.tcpaMin).toBeCloseTo(8 - 2.5 / 60);
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 5 }], 5);
+    const solution = calculateArpaSolution(tracks.T1, { xNm: 0, yNm: 2 - 5 / 3600 * 5 }, { ...own, yNm: 10 * 5 / 3600 });
+    expect(solution.tcpaMin).toBeCloseTo(8 - 5 / 60);
     expect(solution.dcpaNm).toBeCloseTo(0);
   });
 
@@ -92,25 +96,32 @@ describe("ARPA acquisition and tracking", () => {
       { id: "A", xNm: 5 / 3600 * 2.5, yNm: 0 },
       { id: "B", xNm: 1 + 5 / 3600 * 2.5, yNm: 0 },
     ], 2.5);
+    expect(tracks.A.status).toBe("acquiring");
+    expect(tracks.B.status).toBe("acquiring");
+
+    tracks = updateArpaTracks(tracks, [
+      { id: "A", xNm: 5 / 3600 * 5, yNm: 0 },
+      { id: "B", xNm: 1 + 5 / 3600 * 5, yNm: 0 },
+    ], 5);
     expect(tracks.A.status).toBe("tracking");
     expect(tracks.B.status).toBe("tracking");
 
     tracks = updateArpaTracks(tracks, [
-      { id: "A", xNm: 5 / 3600 * 5 + 1, yNm: 0 },
-      { id: "B", xNm: 5 / 3600 * 5, yNm: 0 },
-    ], 5);
+      { id: "A", xNm: 5 / 3600 * 7.5 + 1, yNm: 0 },
+      { id: "B", xNm: 5 / 3600 * 7.5, yNm: 0 },
+    ], 7.5);
     expect(tracks.A.associatedRadarId).toBe("B");
     expect(tracks.B.associatedRadarId).toBe("A");
     expect(tracks.A.swapDetected).toBe(true);
     expect(tracks.B.swapDetected).toBe(true);
     expect(tracks.A.swapCount).toBe(1);
     expect(tracks.B.swapCount).toBe(1);
-    expect(tracks.A.lastSwapSeconds).toBe(5);
+    expect(tracks.A.lastSwapSeconds).toBe(7.5);
 
     tracks = updateArpaTracks(tracks, [
-      { id: "A", xNm: 1 + 5 / 3600 * 7.5, yNm: 0 },
-      { id: "B", xNm: 5 / 3600 * 7.5, yNm: 0 },
-    ], 7.5);
+      { id: "A", xNm: 1 + 5 / 3600 * 10, yNm: 0 },
+      { id: "B", xNm: 5 / 3600 * 10, yNm: 0 },
+    ], 10);
     expect(tracks.A.associatedRadarId).toBe("B");
     expect(tracks.B.associatedRadarId).toBe("A");
     expect(tracks.A.swapDetected).toBe(false);
@@ -160,12 +171,38 @@ describe("ARPA acquisition and tracking", () => {
     expect(tracks.T1.measurements).toHaveLength(8);
     expect(tracks.T1.measurements[0].timeSeconds).toBe(12.5);
     expect(tracks.T1.measurements[7].timeSeconds).toBe(30);
+    expect(tracks.T1.measurementsUsed).toBe(13);
+  });
+
+
+  it("keeps a track in ACQ for two sweeps and enters TRACK on the third observation", () => {
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
+    expect(ARPA_MIN_MEASUREMENTS_FOR_TRACK).toBe(3);
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 1.99 }], 2.5);
+    expect(tracks.T1.status).toBe("acquiring");
+    expect(tracks.T1.estimatedSpeedKn).toBeNull();
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 1.98 }], 5);
+    expect(tracks.T1.status).toBe("tracking");
+    expect(tracks.T1.measurementsUsed).toBe(3);
+  });
+
+  it("reports negative TCPA when the point of closest approach is already past", () => {
+    const track = {
+      ...acquireArpaTarget(target, 0),
+      status: "tracking" as const,
+      targetVelocityEastKn: 0,
+      targetVelocityNorthKn: 15,
+    };
+    const result = calculateArpaSolution(track, target, own);
+    expect(result.tcpaMin).toBeLessThan(0);
+    expect(result.dcpaNm).toBeCloseTo(0);
   });
 
   it("calculates Trial Manoeuvre without changing the original own-ship solution", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 2.5 }], 2.5);
-    const measured = { xNm: 0, yNm: 2 - 5 / 3600 * 2.5 };
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 5 }], 5);
+    const measured = { xNm: 0, yNm: 2 - 5 / 3600 * 5 };
     const baseline = calculateArpaSolution(tracks.T1, measured, own);
     const trial = calculateTrialManoeuvre(tracks.T1, measured, own, { courseDeg: 90, speedKn: 10 });
     expect(trial.tcpaMin).not.toBeCloseTo(baseline.tcpaMin ?? 0);
