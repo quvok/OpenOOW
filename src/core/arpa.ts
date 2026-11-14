@@ -32,6 +32,8 @@ export interface ArpaTrack {
 export type ArpaTrackSet = Record<string, ArpaTrack>;
 
 const MAX_MEASUREMENTS = 8;
+/** A manual acquisition needs three consecutive radar observations before TRACK. */
+export const ARPA_MIN_MEASUREMENTS_FOR_TRACK = 3;
 export const DEFAULT_ARPA_LOST_AFTER_SECONDS = 7.5;
 export const DEFAULT_ARPA_ASSOCIATION_GATE_NM = 0.05;
 
@@ -252,7 +254,7 @@ export function updateArpaTracks(
       timeSeconds,
       radarId: measurement.id,
     }].slice(-MAX_MEASUREMENTS);
-    const velocity = estimateVelocity(samples);
+    const velocity = samples.length >= ARPA_MIN_MEASUREMENTS_FOR_TRACK ? estimateVelocity(samples) : null;
     const speedKn = velocity ? Math.hypot(velocity.eastKn, velocity.northKn) : null;
     const courseDeg = velocity && speedKn !== null && speedKn > 1e-8
       ? (Math.atan2(velocity.eastKn, velocity.northKn) * 180 / Math.PI + 360) % 360
@@ -268,7 +270,7 @@ export function updateArpaTracks(
       targetVelocityNorthKn: velocity?.northKn ?? null,
       estimatedCourseDeg: courseDeg,
       estimatedSpeedKn: speedKn,
-      measurementsUsed: samples.length,
+      measurementsUsed: track.measurementsUsed + 1,
       swapDetected: swapped,
       swapCount: track.swapCount + (swapped ? 1 : 0),
       lastSwapSeconds: swapped ? timeSeconds : track.lastSwapSeconds,
