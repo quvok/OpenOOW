@@ -77,7 +77,7 @@ function estimateVelocity(samples: readonly ArpaMeasurement[]) {
  */
 export function updateArpaTracks(
   tracks: ArpaTrackSet,
-  measurements: readonly Pick<RadarMeasurement, "id" | "xNm" | "yNm">[],
+  scanMeasurements: readonly Pick<RadarMeasurement, "id" | "xNm" | "yNm">[],
   timeSeconds: number,
   lostAfterSeconds = 10,
 ): ArpaTrackSet {
@@ -89,7 +89,7 @@ export function updateArpaTracks(
   let nextTracks = tracks;
   for (const [id, track] of Object.entries(tracks)) {
     if (track.status === "lost") continue;
-    const target = measurements.find((item) => item.id === id);
+    const target = scanMeasurements.find((item) => item.id === id);
     if (!target) {
       if (timeSeconds - track.lastMeasurementSeconds > lostAfterSeconds) {
         if (nextTracks === tracks) nextTracks = { ...tracks };
@@ -99,12 +99,12 @@ export function updateArpaTracks(
     }
     if (timeSeconds <= track.lastMeasurementSeconds + 1e-9) continue;
 
-    const measurements = [...track.measurements, {
+    const nextMeasurements = [...track.measurements, {
       xNm: target.xNm,
       yNm: target.yNm,
       timeSeconds,
     }].slice(-MAX_MEASUREMENTS);
-    const velocity = estimateVelocity(measurements);
+    const velocity = estimateVelocity(nextMeasurements);
     const speedKn = velocity ? Math.hypot(velocity.eastKn, velocity.northKn) : null;
     const courseDeg = velocity && speedKn !== null && speedKn > 1e-8
       ? (Math.atan2(velocity.eastKn, velocity.northKn) * 180 / Math.PI + 360) % 360
@@ -114,7 +114,7 @@ export function updateArpaTracks(
     nextTracks[id] = {
       ...track,
       status: velocity ? "tracking" : "acquiring",
-      measurements,
+      measurements: nextMeasurements,
       lastMeasurementSeconds: timeSeconds,
       targetVelocityEastKn: velocity?.eastKn ?? null,
       targetVelocityNorthKn: velocity?.northKn ?? null,
