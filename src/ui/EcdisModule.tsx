@@ -4,8 +4,8 @@ import type { ShipDynamicsState } from "../core/shipDynamics";
 import type { VesselState } from "../core/navigation";
 import {
   assessRoute, bearingDeg, buildRouteLegs, calculateActiveLegNavigation, calculateWheelOverDistanceNm, chartedDepthAt,
-  formatCoordinate, fromGeographicPosition, resolveActiveLegIndex, toGeographicPosition, TRAINING_CHART_AREAS,
-  TRAINING_CHART_HAZARDS, type GeoOrigin, type RouteWaypoint,
+  formatCoordinate, fromGeographicPosition, importGeoJsonChart, resolveActiveLegIndex, toGeographicPosition, TRAINING_CHART_AREAS,
+  TRAINING_CHART_HAZARDS, type GeoOrigin, type ImportedChartData, type RouteWaypoint,
 } from "../core/ecdis";
 
 interface Props {
@@ -54,6 +54,10 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [shallowContourM, setShallowContourM] = useState(20);
   const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);
   const routeFileInput = useRef<HTMLInputElement>(null);
+  const chartFileInput = useRef<HTMLInputElement>(null);
+  const [importedChart, setImportedChart] = useState<ImportedChartData | null>(null);
+  const chartAreas = importedChart ? importedChart.areas : TRAINING_CHART_AREAS;
+  const chartHazards = importedChart ? importedChart.hazards : TRAINING_CHART_HAZARDS;
 
   const [statusMessage, setStatusMessage] = useState("Нажмите на карту, чтобы добавить первую маршрутную точку.");
   const ownPosition = { eastNm: ship.eastNm, northNm: ship.northNm };
@@ -75,9 +79,9 @@ export default function EcdisModule({ ship, targets }: Props) {
       segmentIndex: activeNavigation.activeLegIndex, alongTrackNm: activeNavigation.alongTrackNm, nearestPoint,
       bearingDeg: bearingDeg(activeNavigation.from, activeNavigation.to) };
   }, [activeNavigation]);
-  const routeAssessment = useMemo(() => assessRoute(route, TRAINING_CHART_AREAS, TRAINING_CHART_HAZARDS, Math.max(requiredDepthM, safetyDepthM)), [route, requiredDepthM, safetyDepthM]);
+  const routeAssessment = useMemo(() => assessRoute(monitoringRoute, chartAreas, chartHazards, Math.max(requiredDepthM, safetyDepthM)), [monitoringRoute, requiredDepthM, safetyDepthM, chartAreas, chartHazards]);
   const legs = useMemo(() => buildRouteLegs(route), [route]);
-  const ownDepth = chartedDepthAt(ownPosition, TRAINING_CHART_AREAS);
+  const ownDepth = chartedDepthAt(ownPosition, chartAreas);
   const selectedWaypoint = route.find((point) => point.id === selectedWaypointId) ?? null;
   const distanceToNext = activeNavigation?.distanceToWaypointNm ?? null;
   const bearingToNext = activeNavigation?.bearingToWaypointDeg ?? null;
@@ -180,6 +184,21 @@ ${points}
     }
   };
 
+  const importChartGeoJson = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      const chart = importGeoJsonChart(parsed, origin, file.name);
+      setImportedChart(chart);
+      setStatusMessage(`Карта загружена: ${chart.featureCount} объектов; площади ${chart.areas.length}, опасности ${chart.hazards.length}, изобаты ${chart.contours.length}, промеры ${chart.soundings.length}.`);
+    } catch (error) {
+      setStatusMessage("Ошибка загрузки карты: " + (error instanceof Error ? error.message : "неизвестная ошибка"));
+    } finally {
+      event.target.value = "";
+    }
+  };
+
   const updateOrigin = (field: keyof GeoOrigin, value: string) => {
     const number = Number(value);
     if (!Number.isFinite(number)) return;
@@ -188,7 +207,7 @@ ${points}
 
   return <section className="ecdis-workspace">
     <div className="ecdis-toolbar">
-      <div className="ecdis-chart-title"><Map size={17}/><div><b>ECDIS · ЭЛЕКТРОННАЯ КАРТА</b><small>TRAINING CHART · NORTH UP · LOCAL TANGENT PLANE</small></div></div>
+      <div className="ecdis-chart-title"><Map size={17}/><div><b>ECDIS · ЭЛЕКТРОННАЯ КАРТА</b><small>{importedChart ? importedChart.name + " · GEOJSON WGS-84" : "TRAINING CHART · NORTH UP · LOCAL TANGENT PLANE"}</small></div></div>
       <div className="ecdis-toolbar-actions">
         <span className={routeAssessment.safe ? "ecdis-status safe" : route.length >= 2 ? "ecdis-status danger" : "ecdis-status idle"}>{route.length < 2 ? "ROUTE NOT PLANNED" : routeAssessment.safe ? "ROUTE CHECK OK" : "ROUTE HAZARD"}</span>
         <button type="button" className={routeEdit ? "ecdis-tool active" : "ecdis-tool"} onClick={() => setRouteEdit((value) => !value)}>{routeEdit ? "ЗАВЕРШИТЬ ПРОКЛАДКУ" : "РЕДАКТИРОВАТЬ МАРШРУТ"}</button>
@@ -196,7 +215,7 @@ ${points}
     </div>
     <div className="ecdis-layout">
       <section className="ecdis-chart-panel">
-        <div className="ecdis-map-meta"><span>DISPLAY: OWN SHIP FOLLOW · {headUp ? "HEAD UP" : "NORTH UP"}</span><span>DEPTH UNITS: METRES</span><span>SCALE 1:{Math.round(50000 / chartScale).toLocaleString("ru-RU")}</span></div>
+        <div className="ecdis-map-meta"><span>DISPLAY: OWN SHIP FOLLOW · {headUp ? "HEAD UP" : "NORTH UP"}</span><span>DEPTH UNITS: METRES</span><span>{importedChart ? "USER CHART" : "SYNTHETIC TRAINING CHART"}</span><span>SCALE 1:{Math.round(50000 / chartScale).toLocaleString("ru-RU")}</span></div>
         <svg className="ecdis-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Учебная электронная навигационная карта" onClick={addWaypoint}>
           <defs>
             <pattern id="ecdis-grid" width={SCALE} height={SCALE} patternUnits="userSpaceOnUse">
@@ -211,10 +230,10 @@ ${points}
             <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#ecdis-grid)"/>
             {Array.from({ length: 25 }, (_, index) => index - 12).map((east) => <text key={"e"+east} x={CENTER_X + east * SCALE + 3} y="16" className="ecdis-grid-label">{east} E</text>)}
             {Array.from({ length: 18 }, (_, index) => index - 9).map((north) => <text key={"n"+north} x="4" y={CENTER_Y - north * SCALE - 3} className="ecdis-grid-label">{north} N</text>)}
-            {TRAINING_CHART_AREAS.filter((area) => area.kind === "charted").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-charted-water"/><text x={toScreen(0,0).x+10} y={toScreen(0,0).y-12} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · CHARTED</text></g>)}
+            {chartAreas.filter((area) => area.kind === "charted").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-charted-water"/><text x={toScreen(0,0).x+10} y={toScreen(0,0).y-12} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · CHARTED</text></g>)}
             {TRAINING_CHART_AREAS.filter((area) => area.kind === "land").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-land"/><polygon points={polygonPoints(area.polygon)} fill="url(#ecdis-land-pattern)"/></g>)}
             {showDepths && TRAINING_CHART_AREAS.filter((area) => area.kind === "shallow").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className={area.depthM !== undefined && area.depthM < safetyDepthM ? "ecdis-shallow ecdis-depth-danger" : area.depthM !== undefined && area.depthM < safetyContourM ? "ecdis-shallow ecdis-depth-safety" : "ecdis-shallow"}/><text x={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).x+8} y={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).y-6} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · {area.name}</text></g>)}
-            {showHazards && TRAINING_CHART_HAZARDS.map((hazard) => { const point = toScreen(hazard.position.eastNm, hazard.position.northNm); return <g key={hazard.id}><circle cx={point.x} cy={point.y} r={hazard.radiusNm*SCALE} className="ecdis-hazard-zone"/><path d={`M ${point.x-8} ${point.y-8} L ${point.x+8} ${point.y+8} M ${point.x+8} ${point.y-8} L ${point.x-8} ${point.y+8}`} className="ecdis-hazard-mark"/><text x={point.x+12} y={point.y-10} className="ecdis-hazard-label">{hazard.name}</text></g>; })}
+            {showDepths && importedChart?.contours.map((contour) => <polyline key={contour.id} points={polygonPoints(contour.points)} className="ecdis-imported-contour"><title>{contour.depthM.toFixed(1)} m</title></polyline>)}\n            {showDepths && importedChart?.soundings.map((sounding) => { const p=toScreen(sounding.position.eastNm,sounding.position.northNm); return <g key={sounding.id} className="ecdis-imported-sounding"><circle cx={p.x} cy={p.y} r="2"/><text x={p.x+4} y={p.y-3}>{sounding.depthM.toFixed(1)}</text></g>; })}\n            {showHazards && chartHazards.map((hazard) => { const point = toScreen(hazard.position.eastNm, hazard.position.northNm); return <g key={hazard.id}><circle cx={point.x} cy={point.y} r={hazard.radiusNm*SCALE} className="ecdis-hazard-zone"/><path d={`M ${point.x-8} ${point.y-8} L ${point.x+8} ${point.y+8} M ${point.x+8} ${point.y-8} L ${point.x-8} ${point.y+8}`} className="ecdis-hazard-mark"/><text x={point.x+12} y={point.y-10} className="ecdis-hazard-label">{hazard.name}</text></g>; })}
             {route.length > 1 && <polyline points={polygonPoints(route)} className="ecdis-route-halo"/>}
             {route.length > 1 && <polyline points={polygonPoints(route)} className="ecdis-route-line"/>}
             {activeNavigation && <line x1={toScreen(activeNavigation.from.eastNm,activeNavigation.from.northNm).x} y1={toScreen(activeNavigation.from.eastNm,activeNavigation.from.northNm).y} x2={toScreen(activeNavigation.to.eastNm,activeNavigation.to.northNm).x} y2={toScreen(activeNavigation.to.eastNm,activeNavigation.to.northNm).y} className="ecdis-active-leg"/>}
@@ -265,7 +284,7 @@ ${points}
             <div><small>XTE</small><b className={crossTrack && crossTrack.distanceNm>xtdNm ? "ecdis-alarm-text" : ""}>{crossTrack ? crossTrack.distanceNm.toFixed(3)+" NM" : "—"}</b></div>
             <div><small>XTD LIMIT</small><b>{xtdNm.toFixed(2)} NM</b></div>
             <div><small>ACTIVE LEG</small><b>{activeNavigation ? `${activeNavigation.from.name} → ${activeNavigation.to.name}` : "—"}</b></div>
-            <div><small>ACTIVE LEG</small><b>{activeNavigation ? `${activeNavigation.from.name} → ${activeNavigation.to.name}` : "—"}</b></div>
+            
             <div><small>BEARING TO WP</small><b>{bearingToNext === null ? "—" : bearingToNext.toFixed(1)+"° T"}</b></div>
             <div><small>DISTANCE TO WP</small><b>{distanceToNext === null ? "—" : distanceToNext.toFixed(2)+" NM"}</b></div>
             <div><small>ROUTE LENGTH</small><b>{routeAssessment.totalDistanceNm.toFixed(2)} NM</b></div>
@@ -281,10 +300,7 @@ ${points}
           <label className="ecdis-setting"><span>Safety contour, м</span><input type="number" min="0" max="100" step="0.5" value={safetyContourM} onChange={(event)=>setSafetyContourM(Math.max(safetyDepthM,Math.min(100,Number(event.target.value)||safetyDepthM)))}/></label>
           <label className="ecdis-setting"><span>Shallow contour, м</span><input type="number" min="0" max="200" step="0.5" value={shallowContourM} onChange={(event)=>setShallowContourM(Math.max(safetyContourM,Math.min(200,Number(event.target.value)||safetyContourM)))}/></label>
           <label className="ecdis-setting"><span>Плановый ROT, °/мин</span><input type="number" min="1" max="60" step="1" value={plannedRotDegPerMin} onChange={(event)=>setPlannedRotDegPerMin(Math.max(1,Math.min(60,Number(event.target.value)||1)))}/></label>
-          <label className="ecdis-setting"><span>Safety depth, м</span><input type="number" min="0" max="100" step="0.5" value={safetyDepthM} onChange={(event)=>setSafetyDepthM(Math.max(0,Math.min(100,Number(event.target.value)||0)))}/></label>
-          <label className="ecdis-setting"><span>Safety contour, м</span><input type="number" min="0" max="100" step="0.5" value={safetyContourM} onChange={(event)=>setSafetyContourM(Math.max(safetyDepthM,Math.min(100,Number(event.target.value)||safetyDepthM)))}/></label>
-          <label className="ecdis-setting"><span>Shallow contour, м</span><input type="number" min="0" max="200" step="0.5" value={shallowContourM} onChange={(event)=>setShallowContourM(Math.max(safetyContourM,Math.min(200,Number(event.target.value)||safetyContourM)))}/></label>
-          <label className="ecdis-setting"><span>Плановый ROT, °/мин</span><input type="number" min="1" max="60" step="1" value={plannedRotDegPerMin} onChange={(event)=>setPlannedRotDegPerMin(Math.max(1,Math.min(60,Number(event.target.value)||1)))}/></label>
+
         </section>
         <section className="ecdis-data-block">
           <div className="ecdis-block-heading"><span>ROUTE PLAN</span><b>ПЛАНИРОВАНИЕ</b></div>
@@ -316,7 +332,7 @@ ${points}
             <b>{route.length<2?"НЕДОСТАТОЧНО ДАННЫХ":routeAssessment.safe?"ОПАСНОСТИ НЕ ОБНАРУЖЕНЫ":"ОБНАРУЖЕНЫ ОПАСНОСТИ"}</b>
             <span>Требуемая глубина: {requiredDepthM.toFixed(1)} м · Safety depth: {safetyDepthM.toFixed(1)} м · контуры {safetyContourM.toFixed(1)}/{shallowContourM.toFixed(1)} м · минимум на маршруте: {routeAssessment.minimumChartedDepthM === null ? "нет данных" : routeAssessment.minimumChartedDepthM.toFixed(1) + " м"}</span>
             {requiredDepthM < safetyDepthM && <small>Safety depth выше расчётной требуемой глубины: проверьте настройки.</small>}
-            {requiredDepthM < safetyDepthM && <small>Safety depth выше расчётной требуемой глубины: проверьте настройки.</small>}
+
             {routeAssessment.warnings.length ? routeAssessment.warnings.map((warning,index)=><small key={index}>{warning}</small>) : <small>Проверка выполнена по имеющимся данным учебной карты.</small>}
           </div>
         </section>
@@ -324,7 +340,7 @@ ${points}
           <div className="ecdis-block-heading"><span>CHART REFERENCE</span><b>КООРДИНАТНАЯ ОСНОВА</b></div>
           <label className="ecdis-setting"><span>Широта начала, °</span><input type="number" min="-89.9" max="89.9" step="0.0001" value={origin.latitudeDeg} onChange={(event)=>updateOrigin("latitudeDeg",event.target.value)}/></label>
           <label className="ecdis-setting"><span>Долгота начала, °</span><input type="number" min="-180" max="180" step="0.0001" value={origin.longitudeDeg} onChange={(event)=>updateOrigin("longitudeDeg",event.target.value)}/></label>
-          <p className="ecdis-disclaimer">Данные карты синтетические и предназначены только для обучения. Некартографированные участки помечаются как неизвестные и не считаются безопасными. Это не официальная ENC, не S-57/S-101 и не пригодно для реального судовождения. Географические координаты вычисляются относительно заданной точки начала в локальной плоской системе.</p>
+          <p className="ecdis-disclaimer">Если загружена GeoJSON-карта, она должна быть в WGS-84 и содержать распознаваемые свойства объектов. Для S-57/S-101 требуется предварительная конвертация; бинарные ENC и S-52 пока не поддерживаются. Учебная карта синтетическая. Данные не сертифицированы и не пригодны для реального судовождения. Географические координаты вычисляются относительно заданной точки начала в локальной плоской системе.</p>
         </section>
       </aside>
     </div>
