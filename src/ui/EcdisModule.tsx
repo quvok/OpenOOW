@@ -219,7 +219,7 @@ ${points}
     <div className="ecdis-toolbar">
       <div className="ecdis-chart-title"><Map size={17}/><div><b>ECDIS · ЭЛЕКТРОННАЯ КАРТА</b><small>{importedChart ? importedChart.name + " · GEOJSON WGS-84" : "TRAINING CHART · NORTH UP · LOCAL TANGENT PLANE"}</small></div></div>
       <div className="ecdis-toolbar-actions">
-        <span className={routeAssessment.safe ? "ecdis-status safe" : route.length >= 2 ? "ecdis-status danger" : "ecdis-status idle"}>{route.length < 1 ? "ROUTE NOT PLANNED" : routeAssessment.safe ? "ROUTE CHECK OK" : "ROUTE HAZARD"}</span>
+        <span className={routeAssessment.safe ? "ecdis-status safe" : route.length >= 1 ? "ecdis-status danger" : "ecdis-status idle"}>{route.length < 1 ? "ROUTE NOT PLANNED" : routeAssessment.safe ? "ROUTE CHECK OK" : "ROUTE HAZARD"}</span>
         <button type="button" className={routeEdit ? "ecdis-tool active" : "ecdis-tool"} onClick={() => setRouteEdit((value) => !value)}>{routeEdit ? "ЗАВЕРШИТЬ ПРОКЛАДКУ" : "РЕДАКТИРОВАТЬ МАРШРУТ"}</button>
       </div>
     </div>
