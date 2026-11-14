@@ -221,8 +221,7 @@ function isPowerDriven(profile: ColregVesselProfile): boolean {
 
 function profileRank(profile: ColregVesselProfile): number | null {
   if (profile.kind === "wig-craft" && !profile.wigOnSurface) return -1;
-  if (profile.kind === "seaplane" && profile.seaplaneOnWater) return -1;
-  if (profile.kind === "seaplane") return profile.seaplaneOnWater ? 0 : null;
+  if (profile.kind === "seaplane") return profile.seaplaneOnWater ? -1 : null;
   if (profile.kind === "nuc" || profile.kind === "ram") return 3;
   if (profile.kind === "fishing" && profile.engagedInFishing) return 2;
   if (profile.kind === "sailing" && !profile.underSailAndPower) return 1;
@@ -243,7 +242,7 @@ function classifyRule18(
   const ownSeaplaneOnWater = own.kind === "seaplane" && own.seaplaneOnWater === true;
   const targetSeaplaneOnWater = target.kind === "seaplane" && target.seaplaneOnWater === true;
   if ((ownWigInFlight || ownSeaplaneOnWater) && (targetWigInFlight || targetSeaplaneOnWater)) {
-    return { responsibility: "undetermined", duty: "Оба WIG находятся в полёте у поверхности. Правило 18(f) требует каждому держаться в стороне от других судов; проверьте фактическую траекторию и специальные обстоятельства." };
+    return { responsibility: "undetermined", duty: "Оба судна относятся к категориям с особой обязанностью держаться в стороне от других судов по правилу 18(e)/(f). При отсутствии обычной пары «уступающее/сохраняющее курс» проверьте фактические траектории и специальные обстоятельства." };
   }
   if (ownWigInFlight || ownSeaplaneOnWater) {
     return { responsibility: "give-way", duty: ownWigInFlight
@@ -478,7 +477,7 @@ export function assessColregEncounter(
       ownShipDuty = "При подтверждённой ситуации пересечения цель находится слева, поэтому собственное судно обычно сохраняет курс и скорость по правилу 17. Это не освобождает от наблюдения и действий, когда этого требует правило 17.";
     } else {
       const hierarchy = classifyRule18(ownProfile, targetProfile);
-      const specialKeepClearSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface);
+      const specialKeepClearSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface) || (ownProfile.kind === "seaplane" && ownProfile.seaplaneOnWater) || (targetProfile.kind === "seaplane" && targetProfile.seaplaneOnWater);
       if (hierarchy.responsibility !== "undetermined" && ((ownProfile.underway && targetProfile.underway) || specialKeepClearSituation)) {
         encounter = "vessel-priority";
         primaryRule = 18;
@@ -560,8 +559,8 @@ export function assessColregEncounter(
     });
   }
 
-  const ownLightKind = ownProfile.underSailAndPower || (ownProfile.kind === "wig-craft" && ownProfile.wigOnSurface) || (ownProfile.kind === "seaplane" && ownProfile.seaplaneOnWater) || (ownProfile.kind === "fishing" && !ownProfile.engagedInFishing) ? "power-driven" : ownProfile.kind;
-  const targetLightKind = targetProfile.underSailAndPower || (targetProfile.kind === "wig-craft" && targetProfile.wigOnSurface) || (targetProfile.kind === "seaplane" && targetProfile.seaplaneOnWater) || (targetProfile.kind === "fishing" && !targetProfile.engagedInFishing) ? "power-driven" : targetProfile.kind;
+  const ownLightKind = ownProfile.underSailAndPower || (ownProfile.kind === "wig-craft" && ownProfile.wigOnSurface) || (ownProfile.kind === "fishing" && !ownProfile.engagedInFishing) ? "power-driven" : ownProfile.kind;
+  const targetLightKind = targetProfile.underSailAndPower || (targetProfile.kind === "wig-craft" && targetProfile.wigOnSurface) || (targetProfile.kind === "fishing" && !targetProfile.engagedInFishing) ? "power-driven" : targetProfile.kind;
   const ownLightBase = getVesselLightGuidance(ownLightKind);
   const targetLightBase = getVesselLightGuidance(targetLightKind);
   const ownLightGuidance = { ...ownLightBase, lights: [...ownLightBase.lights], dayShapes: [...ownLightBase.dayShapes], notes: [...ownLightBase.notes] };
