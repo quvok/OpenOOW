@@ -293,7 +293,7 @@ ${points}
           </div>
           <label className="ecdis-setting"><span>Радиус прибытия WP, NM</span><input type="number" min="0.01" max="0.5" step="0.01" value={arrivalRadiusNm} onChange={(event)=>setArrivalRadiusNm(Math.max(0.01,Math.min(0.5,Number(event.target.value)||0.05)))}/></label>
           <label className="ecdis-setting"><span>Допуск XTD, NM</span><input type="number" min="0.05" max="5" step="0.05" value={xtdNm} onChange={(event)=>setXtdNm(Math.max(0.05,Math.min(5,Number(event.target.value)||0.05)))}/></label>
-          <label className="ecdis-setting"><span>Радиус прибытия WP, NM</span><input type="number" min="0.01" max="0.5" step="0.01" value={arrivalRadiusNm} onChange={(event)=>setArrivalRadiusNm(Math.max(0.01,Math.min(0.5,Number(event.target.value)||0.05)))}/></label>
+
           <label className="ecdis-setting"><span>Осадка судна, м</span><input type="number" min="0.5" max="30" step="0.1" value={draftM} onChange={(event)=>setDraftM(Math.max(0.5,Math.min(30,Number(event.target.value)||0.5)))}/></label>
           <label className="ecdis-setting"><span>Запас под килем, м</span><input type="number" min="0" max="20" step="0.1" value={ukcM} onChange={(event)=>setUkcM(Math.max(0,Math.min(20,Number(event.target.value)||0)))}/></label>
           <label className="ecdis-setting"><span>Safety depth, м</span><input type="number" min="0" max="100" step="0.5" value={safetyDepthM} onChange={(event)=>setSafetyDepthM(Math.max(0,Math.min(100,Number(event.target.value)||0)))}/></label>
@@ -318,13 +318,7 @@ ${points}
             const wheelOver = calculateWheelOverDistanceNm(ship.speedKn, plannedRotDegPerMin, delta);
             return <small key={point.id}>{point.name}: {wheelOver === null ? "—" : wheelOver.toFixed(3) + " NM before WP"} · ΔC {Math.abs(delta).toFixed(0)}°</small>;
           })}</div>}
-          {route.length > 2 && <div className="ecdis-selected-waypoint"><b>WHEEL-OVER ESTIMATE</b><span>ROT {plannedRotDegPerMin.toFixed(0)}°/min · based on current SOG {ship.speedKn.toFixed(1)} kn</span>{route.slice(1, -1).map((point, index) => {
-            const incoming = bearingDeg(route[index], point);
-            const outgoing = bearingDeg(point, route[index + 2]);
-            const delta = ((outgoing - incoming + 540) % 360) - 180;
-            const wheelOver = calculateWheelOverDistanceNm(ship.speedKn, plannedRotDegPerMin, delta);
-            return <small key={point.id}>{point.name}: {wheelOver === null ? "—" : wheelOver.toFixed(3) + " NM before WP"} · ΔC {Math.abs(delta).toFixed(0)}°</small>;
-          })}</div>}
+
         </section>
         <section className="ecdis-data-block">
           <div className="ecdis-block-heading"><span>SAFETY CHECK</span><b>ПРОВЕРКА БЕЗОПАСНОСТИ</b></div>
