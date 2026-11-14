@@ -175,8 +175,9 @@ describe("COLREG context and encounter assessment", () => {
       ownProfile: { kind: "seaplane", seaplaneOnWater: true },
       targetProfile: { kind: "power-driven" },
     });
-    expect(result.encounter).toBe("crossing-starboard");
-    expect(result.ownLightGuidance.rule).toBe(23);
+    expect(result.primaryRule).toBe(18);
+    expect(result.responsibility).toBe("give-way");
+    expect(result.ownLightGuidance.rule).toBe(31);
   });
 
   it("applies Rule 18(f) to a WIG in flight and power-driven rules when on the water", () => {
