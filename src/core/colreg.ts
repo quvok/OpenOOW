@@ -214,13 +214,14 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
 }
 
 function isPowerDriven(profile: ColregVesselProfile): boolean {
-  return (profile.kind === "wig-craft" && profile.wigOnSurface === true) || (profile.kind === "seaplane" && profile.seaplaneOnWater === true) || profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
+  return (profile.kind === "wig-craft" && profile.wigOnSurface === true) || profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
     (profile.kind === "fishing" && !profile.engagedInFishing) ||
     (profile.kind === "sailing" && profile.underSailAndPower === true);
 }
 
 function profileRank(profile: ColregVesselProfile): number | null {
   if (profile.kind === "wig-craft" && !profile.wigOnSurface) return -1;
+  if (profile.kind === "seaplane" && profile.seaplaneOnWater) return -1;
   if (profile.kind === "seaplane") return profile.seaplaneOnWater ? 0 : null;
   if (profile.kind === "nuc" || profile.kind === "ram") return 3;
   if (profile.kind === "fishing" && profile.engagedInFishing) return 2;
@@ -239,14 +240,20 @@ function classifyRule18(
 ): { responsibility: ColregResponsibility; duty: string } {
   const ownWigInFlight = own.kind === "wig-craft" && !own.wigOnSurface;
   const targetWigInFlight = target.kind === "wig-craft" && !target.wigOnSurface;
-  if (ownWigInFlight && targetWigInFlight) {
+  const ownSeaplaneOnWater = own.kind === "seaplane" && own.seaplaneOnWater === true;
+  const targetSeaplaneOnWater = target.kind === "seaplane" && target.seaplaneOnWater === true;
+  if ((ownWigInFlight || ownSeaplaneOnWater) && (targetWigInFlight || targetSeaplaneOnWater)) {
     return { responsibility: "undetermined", duty: "Оба WIG находятся в полёте у поверхности. Правило 18(f) требует каждому держаться в стороне от других судов; проверьте фактическую траекторию и специальные обстоятельства." };
   }
-  if (ownWigInFlight) {
-    return { responsibility: "give-way", duty: "WIG при взлёте, посадке и полёте у поверхности должен держаться в стороне от всех других судов и не затруднять их движение (правило 18(f))." };
+  if (ownWigInFlight || ownSeaplaneOnWater) {
+    return { responsibility: "give-way", duty: ownWigInFlight
+      ? "WIG при взлёте, посадке и полёте у поверхности должен держаться в стороне от всех других судов и не затруднять их движение (правило 18(f))."
+      : "Гидросамолёт на воде должен в общем случае держаться в стороне от всех судов и не затруднять их движение; при возникновении риска столкновения соблюдайте правила раздела II (правило 18(e))." };
   }
-  if (targetWigInFlight) {
-    return { responsibility: "stand-on", duty: "Цель — WIG в полёте у поверхности; она должна держаться в стороне от всех других судов и не затруднять их движение (правило 18(f)). Продолжайте наблюдение." };
+  if (targetWigInFlight || targetSeaplaneOnWater) {
+    return { responsibility: "stand-on", duty: targetWigInFlight
+      ? "Цель — WIG в полёте у поверхности; она должна держаться в стороне от всех судов и не затруднять их движение (правило 18(f)). Продолжайте наблюдение."
+      : "Цель — гидросамолёт на воде; он должен в общем случае держаться в стороне от всех судов и не затруднять их движение (правило 18(e)). Продолжайте наблюдение." };
   }
   if (own.kind === "constrained-draught" && target.kind === "constrained-draught") {
     return { responsibility: "undetermined", duty: "Оба судна ограничены своей осадкой. Правило 18 не устанавливает приоритет между ними; каждое должно учитывать условия и не затруднять безопасное движение другого." };
@@ -471,8 +478,8 @@ export function assessColregEncounter(
       ownShipDuty = "При подтверждённой ситуации пересечения цель находится слева, поэтому собственное судно обычно сохраняет курс и скорость по правилу 17. Это не освобождает от наблюдения и действий, когда этого требует правило 17.";
     } else {
       const hierarchy = classifyRule18(ownProfile, targetProfile);
-      const wigFlightSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface);
-      if (hierarchy.responsibility !== "undetermined" && ((ownProfile.underway && targetProfile.underway) || wigFlightSituation)) {
+      const specialKeepClearSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface) || (ownProfile.kind === "seaplane" && ownProfile.seaplaneOnWater) || (targetProfile.kind === "seaplane" && targetProfile.seaplaneOnWater);
+      if (hierarchy.responsibility !== "undetermined" && ((ownProfile.underway && targetProfile.underway) || specialKeepClearSituation)) {
         encounter = "vessel-priority";
         primaryRule = 18;
         title = "Взаимные обязанности по статусу судов";
