@@ -31,8 +31,8 @@ describe("ARPA acquisition and tracking", () => {
   it("calculates CPA/TCPA from estimated velocity and own-ship velocity", () => {
     let tracks = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ ...target, yNm: 2 - 5 / 3600 * 5 }], 5);
-    const solution = calculateArpaSolution(tracks.T1, { xNm: 0, yNm: 2 - 5 / 3600 * 5 }, own);
-    expect(solution.tcpaMin).toBeCloseTo(8);
+    const solution = calculateArpaSolution(tracks.T1, { xNm: 0, yNm: 2 - 5 / 3600 * 5 }, { ...own, yNm: 10 * 5 / 3600 });
+    expect(solution.tcpaMin).toBeCloseTo(8 - 5 / 60);
     expect(solution.dcpaNm).toBeCloseTo(0);
   });
 
