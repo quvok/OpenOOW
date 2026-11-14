@@ -1,0 +1,1 @@
+export const KNOT_TO_MPS=1852/3600; export const DEG_TO_RAD=Math.PI/180; export const RAD_TO_DEG=180/Math.PI; export function knotsToMps(v:number){return v*KNOT_TO_MPS} export function normalize360(v:number){return ((v%360)+360)%360}
