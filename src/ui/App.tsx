@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
+import { courseVectorToRadar, projectRelativePosition } from "../core/radar";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
@@ -168,7 +169,7 @@ export default function App() {
       </section>
       <div className="main-grid">
         <section className="panel radar-panel">
-          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · VECTOR 6 MIN</span></div>
           <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
             {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
@@ -178,17 +179,22 @@ export default function App() {
             <path d={"M" + x + " " + y + " L" + eblX + " " + eblY} className="ebl-line"/>
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
             {targets.map((target) => {
-              const relativeEastNm = target.xNm - ship.eastNm;
-              const relativeNorthNm = target.yNm - ship.northNm;
-              const tx = RADAR_CENTER + (relativeEastNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
-              const ty = RADAR_CENTER - (relativeNorthNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
-              const vectorDistanceNm = target.speedKn * (RADAR_VECTOR_MINUTES / 60);
-              const vectorLengthPx = (vectorDistanceNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
-              return <g key={target.id} transform={"translate(" + tx + " " + ty + ")"}>
-                <g transform={"rotate(" + target.courseDeg + ")"}>
-                  <path d={"M0 0 L0 " + -vectorLengthPx} className="target-vector"/>
-                  <path d={"M-5 " + (-vectorLengthPx + 8) + " L0 " + -vectorLengthPx + " L5 " + (-vectorLengthPx + 8)} className="target-vector-head"/>
-                </g>
+              const point = projectRelativePosition(ownVessel, target, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
+              const vector = courseVectorToRadar(target.courseDeg, target.speedKn, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX);
+              const vectorLength = Math.hypot(vector.dx, vector.dy);
+              const unitX = vectorLength > 0 ? vector.dx / vectorLength : 0;
+              const unitY = vectorLength > 0 ? vector.dy / vectorLength : 0;
+              const baseX = vector.dx - unitX * 8;
+              const baseY = vector.dy - unitY * 8;
+              const wing = 4;
+              const arrowHead = vectorLength > 0
+                ? " M" + (baseX - unitY * wing) + " " + (baseY + unitX * wing) +
+                  " L" + vector.dx + " " + vector.dy +
+                  " L" + (baseX + unitY * wing) + " " + (baseY - unitX * wing)
+                : "";
+              return <g key={target.id} transform={"translate(" + point.x + " " + point.y + ")"}>
+                <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>
+                {vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
                 <circle r="7" className="target-echo"/>
                 <text x="12" y="4">{target.id}</text>
                 <text x="12" y="17" className="target-course-label">{target.courseDeg.toFixed(0)}°T</text>
