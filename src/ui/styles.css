@@ -538,3 +538,10 @@ input[type=range]{accent-color:#a6b58b}
 .target-block-menu a:last-child{border-bottom:0}
 .target-block-menu a:hover,.target-block-menu a:focus{background:#35474f;color:#f0dba7;outline:1px solid #bda66c}
 #panel-arpa-display,#panel-arpa-targets,#panel-colreg-assessment,#panel-autopilot{scroll-margin-top:18px}
+
+/* The arrow expands the actual ARPA/COLREG/autopilot panels inside Targets Information */
+.target-info-expanded-blocks{display:flex;flex-direction:column;gap:10px;margin-top:8px;min-width:0}
+.target-information-panel>.target-info-expanded-blocks>.panel{width:100%;min-width:0;margin:0}
+.target-information-panel>.target-info-expanded-blocks .panel-heading{margin-bottom:10px}
+.target-information-panel>.target-info-expanded-blocks .colreg-live-panel{max-width:100%}
+.target-information-panel>.target-info-expanded-blocks .autopilot-panel{max-width:100%}
