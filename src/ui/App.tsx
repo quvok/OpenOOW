@@ -361,7 +361,7 @@ export default function App() {
 
     <section className="workspace">
       <header className="topbar transas-topbar">
-        <div className="equipment-brand"><span className="equipment-mark">O</span><div><b>OPENOOW</b><small>RADAR / ARPA SIMULATOR</small></div></div>
+        <div className="equipment-brand"><span className="equipment-mark">O</span><div><b>OPENOOW</b><small>MARITIME NAVIGATION SIMULATOR</small></div></div>
         <div className="equipment-title"><strong>{activeTab === "radar" ? "RADAR / ARPA" : "ECDIS"}</strong><span>{activeTab === "radar" ? activeScenario.title : "ЭЛЕКТРОННАЯ КАРТА И ПЛАНИРОВАНИЕ МАРШРУТА"}</span></div>
         <div className="header-actions">{activeTab === "radar" && <button type="button" className="header-key" onClick={() => setScenarioDialogOpen(true)}>СЦЕНАРИЙ</button>}<div className={running ? "status live" : "status"}><i/>{running ? "SIM RUNNING" : "SIM PAUSED"}</div></div>
       </header>
