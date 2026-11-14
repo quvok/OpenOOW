@@ -213,6 +213,112 @@ export const ENCOUNTER_SCENARIOS: EncounterScenario[] = [
       "Правило 10 не отменяет обязанности оценивать риск столкновения и применять остальные правила."
     ]
   }
+,
+  {
+    id: "crossing-stand-on",
+    title: "Пересечение: своё судно сохраняет курс",
+    category: "МППСС-72 · Правило 17",
+    description: "Два механических судна пересекаются, цель находится слева от собственного судна.",
+    task: "Сохраняйте курс и скорость, наблюдайте за действиями уступающего судна и будьте готовы вмешаться по правилу 17.",
+    ruleReference: "Правила 15 и 17 — судно, сохраняющее курс и скорость.",
+    ownShip: { courseDeg: 0, speedKn: 10 },
+    targets: [{ id: "T1", xNm: -1, yNm: 1, courseDeg: 90, speedKn: 10 }],
+    visibilityNm: 10,
+    colregContext: {
+      ownProfile: { kind: "power-driven", lengthM: 90 },
+      targetProfile: { kind: "power-driven", lengthM: 70 },
+      environment: { visibility: "good", vesselsInSight: true, daylight: true },
+    },
+    debrief: [
+      "Цель находится на левом борту собственного судна.",
+      "При подтверждённом риске столкновения собственное судно является сохраняющим курс и скорость.",
+      "Если уступающее судно не действует должным образом, будьте готовы предпринять действие; если его действия недостаточны для предотвращения столкновения, действуйте самостоятельно."
+    ]
+  },
+  {
+    id: "sailing-windward-rule12",
+    title: "Парусные суда: наветренное и подветренное",
+    category: "МППСС-72 · Правило 12",
+    description: "Два парусных судна идут одним галсом; собственное судно находится с наветренной стороны.",
+    task: "Определите наветренное и подветренное судно. Наветренное судно должно уступить подветренному.",
+    ruleReference: "Правило 12(b) — парусные суда на одном галсе.",
+    ownShip: { courseDeg: 0, speedKn: 6 },
+    targets: [{ id: "T1", xNm: 1, yNm: 1, courseDeg: 270, speedKn: 6 }],
+    visibilityNm: 10,
+    colregContext: {
+      ownProfile: { kind: "sailing", tack: "starboard", windward: true },
+      targetProfile: { kind: "sailing", tack: "starboard", windward: false },
+      environment: { visibility: "good", vesselsInSight: true, daylight: true },
+    },
+    debrief: [
+      "Оба судна идут одним галсом.",
+      "Наветренное судно должно держаться в стороне от подветренного.",
+      "Не путайте наветренное положение с тем, какое судно находится на правом или левом борту."
+    ]
+  },
+  {
+    id: "ram-rule18",
+    title: "Механическое судно и RAM",
+    category: "МППСС-72 · Правило 18",
+    description: "Цель ограничена в возможности маневрировать из-за характера выполняемой операции.",
+    task: "Распознайте статус RAM и оцените обязанность собственного механического судна держаться в стороне.",
+    ruleReference: "Правило 18 — механическое судно держится в стороне от судна, ограниченного в возможности маневрировать.",
+    ownShip: { courseDeg: 0, speedKn: 10 },
+    targets: [{ id: "T1", xNm: 1, yNm: 1, courseDeg: 270, speedKn: 0 }],
+    visibilityNm: 10,
+    colregContext: {
+      ownProfile: { kind: "power-driven", lengthM: 110 },
+      targetProfile: { kind: "ram", underway: true, makingWay: false, lengthM: 65 },
+      environment: { visibility: "good", vesselsInSight: true, daylight: false },
+    },
+    debrief: [
+      "RAM обозначается красным–белым–красным круговыми огнями или шаром–ромбом–шаром.",
+      "Механическое судно должно держаться в стороне от RAM.",
+      "Проверьте, какая именно операция ограничивает маневренность и где находится препятствие."
+    ]
+  },
+  {
+    id: "cbd-rule18",
+    title: "Судно, ограниченное осадкой",
+    category: "МППСС-72 · Правило 18",
+    description: "Цель ограничена своей осадкой и нуждается в безопасном проходе по доступной глубине.",
+    task: "Не считайте CBD судном с безусловным приоритетом, но учитывайте обязанность других судов не затруднять его безопасный проход, если обстоятельства позволяют.",
+    ruleReference: "Правило 18(d) и правило 28 — судно, ограниченное своей осадкой.",
+    ownShip: { courseDeg: 0, speedKn: 10 },
+    targets: [{ id: "T1", xNm: 1, yNm: 1, courseDeg: 270, speedKn: 8 }],
+    visibilityNm: 10,
+    colregContext: {
+      ownProfile: { kind: "power-driven", lengthM: 95 },
+      targetProfile: { kind: "constrained-draught", lengthM: 190 },
+      environment: { visibility: "good", vesselsInSight: true, daylight: true },
+    },
+    debrief: [
+      "CBD обозначается тремя красными круговыми огнями или чёрным цилиндром.",
+      "Другие суда, кроме NUC и RAM, должны по возможности не затруднять безопасный проход CBD.",
+      "Правило 18(d) не означает безусловного приоритета CBD над всеми судами."
+    ]
+  },
+  {
+    id: "wig-rule18",
+    title: "WIG в полёте у поверхности",
+    category: "МППСС-72 · Правило 18(f)",
+    description: "Судно на динамической воздушной подушке выполняет полёт у поверхности воды и сближается с механическим судном.",
+    task: "Определите, что WIG в полёте у поверхности должен держаться в стороне от всех других судов. При движении по поверхности воды он действует как механическое судно.",
+    ruleReference: "Правило 18(f) и правило 31 — WIG craft.",
+    ownShip: { courseDeg: 0, speedKn: 35 },
+    targets: [{ id: "T1", xNm: 1, yNm: 1, courseDeg: 270, speedKn: 10 }],
+    visibilityNm: 10,
+    colregContext: {
+      ownProfile: { kind: "wig-craft", wigOnSurface: false, lengthM: 28 },
+      targetProfile: { kind: "power-driven", lengthM: 90 },
+      environment: { visibility: "good", vesselsInSight: true, daylight: true },
+    },
+    debrief: [
+      "WIG при взлёте, посадке и полёте у поверхности должен держаться в стороне от всех судов и не затруднять их движение.",
+      "На поверхности воды WIG соблюдает правила для механических судов.",
+      "Не путайте WIG с обычным судном на воздушной подушке."
+    ]
+  }
 ];
 
 export function getScenarioTargetCpa(scenario: EncounterScenario): Array<{ target: VesselState; cpa: CpaResult | null }> {
