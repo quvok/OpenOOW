@@ -213,7 +213,7 @@ describe("COLREG context and encounter assessment", () => {
     });
     expect(result.primaryRule).toBe(18);
     expect(result.responsibility).toBe("no-specific-duty");
-    expect(result.ownShipDuty).toContain("не затруднять");
+    expect(result.ownShipDuty).toContain("не затрудняйте");
   });
 
   it("adds Rules 9 and 10 when narrow-channel or TSS context is supplied", () => {
@@ -227,7 +227,7 @@ describe("COLREG context and encounter assessment", () => {
   it("exposes night and restricted-visibility light guidance", () => {
     const result = assessColregEncounter(own(), target(0, 2), {
       ownProfile: { kind: "power-driven" },
-      targetProfile: { kind: "fishing" },
+      targetProfile: { kind: "fishing", engagedInFishing: true },
       environment: { daylight: false, visibility: "restricted", vesselsInSight: false },
     });
     expect(result.ownLightGuidance.rule).toBe(23);
@@ -284,7 +284,7 @@ describe("COLREG context and encounter assessment", () => {
   });
 
   it("uses the top-level legacy DCPA threshold", () => {
-    const result = assessColregEncounter(own(), target(1, 1, 270, 10), { riskDcpaNm: 0 });
+    const result = assessColregEncounter(own(), target(1, 0, 270, 10), { riskDcpaNm: 1 });
     expect(result.collisionRisk).toBe("risk");
   });
 
