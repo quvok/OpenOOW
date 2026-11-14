@@ -119,6 +119,66 @@ function predictTrackPosition(track: ArpaTrack, timeSeconds: number) {
   };
 }
 
+/** Rectangular Hungarian assignment: each row receives one unique column. */
+function minimumCostAssignment(costs: readonly (readonly number[])[]): number[] {
+  const rowCount = costs.length;
+  if (rowCount === 0) return [];
+  const columnCount = costs[0].length;
+  if (columnCount < rowCount || costs.some((row) => row.length !== columnCount)) {
+    throw new RangeError("ARPA assignment matrix must be rectangular with at least as many columns as rows.");
+  }
+  const u = Array(rowCount + 1).fill(0);
+  const v = Array(columnCount + 1).fill(0);
+  const p = Array(columnCount + 1).fill(0);
+  const way = Array(columnCount + 1).fill(0);
+
+  for (let i = 1; i <= rowCount; i += 1) {
+    p[0] = i;
+    let column0 = 0;
+    const minValues = Array(columnCount + 1).fill(Number.POSITIVE_INFINITY);
+    const used = Array(columnCount + 1).fill(false);
+    do {
+      used[column0] = true;
+      const row0 = p[column0];
+      let delta = Number.POSITIVE_INFINITY;
+      let column1 = 0;
+      for (let j = 1; j <= columnCount; j += 1) {
+        if (used[j]) continue;
+        const current = costs[row0 - 1][j - 1] - u[row0] - v[j];
+        if (current < minValues[j]) {
+          minValues[j] = current;
+          way[j] = column0;
+        }
+        if (minValues[j] < delta) {
+          delta = minValues[j];
+          column1 = j;
+        }
+      }
+      for (let j = 0; j <= columnCount; j += 1) {
+        if (used[j]) {
+          u[p[j]] += delta;
+          v[j] -= delta;
+        } else {
+          minValues[j] -= delta;
+        }
+      }
+      column0 = column1;
+    } while (p[column0] !== 0);
+
+    do {
+      const column1 = way[column0];
+      p[column0] = p[column1];
+      column0 = column1;
+    } while (column0 !== 0);
+  }
+
+  const assignment = Array(rowCount).fill(-1);
+  for (let j = 1; j <= columnCount; j += 1) {
+    if (p[j] !== 0) assignment[p[j] - 1] = j - 1;
+  }
+  return assignment;
+}
+
 function restartTrack(track: ArpaTrack, measurement: Pick<RadarMeasurement, "id" | "xNm" | "yNm">, timeSeconds: number): ArpaTrack {
   return {
     ...acquireArpaTarget(measurement, timeSeconds),
@@ -151,26 +211,27 @@ export function updateArpaTracks(
 
   const next: ArpaTrackSet = { ...tracks };
   const activeTracks = Object.values(tracks).filter((track) => track.status !== "lost");
-  const pairs: Array<{ track: ArpaTrack; measurement: typeof scanMeasurements[number]; distance: number }> = [];
-
-  for (const track of activeTracks) {
+  const unmatchedCost = (associationGateNm + 1) * (activeTracks.length + 1);
+  const invalidCost = unmatchedCost * 100;
+  const costMatrix = activeTracks.map((track) => {
     const predicted = predictTrackPosition(track, timeSeconds);
-    for (const measurement of scanMeasurements) {
+    const echoCosts = scanMeasurements.map((measurement) => {
       const distance = Math.hypot(measurement.xNm - predicted.xNm, measurement.yNm - predicted.yNm);
-      if (distance <= associationGateNm) pairs.push({ track, measurement, distance });
-    }
-  }
-  pairs.sort((a, b) => a.distance - b.distance);
-
-  const assignedTracks = new Set<string>();
+      return distance <= associationGateNm ? distance : invalidCost;
+    });
+    return [...echoCosts, ...Array(activeTracks.length).fill(unmatchedCost)];
+  });
+  const assignedColumns = minimumCostAssignment(costMatrix);
   const assignedEchoes = new Set<string>();
   const assignments = new Map<string, typeof scanMeasurements[number]>();
-  for (const pair of pairs) {
-    if (assignedTracks.has(pair.track.targetId) || assignedEchoes.has(pair.measurement.id)) continue;
-    assignedTracks.add(pair.track.targetId);
-    assignedEchoes.add(pair.measurement.id);
-    assignments.set(pair.track.targetId, pair.measurement);
-  }
+  activeTracks.forEach((track, index) => {
+    const column = assignedColumns[index];
+    if (column >= 0 && column < scanMeasurements.length && costMatrix[index][column] <= associationGateNm) {
+      const measurement = scanMeasurements[column];
+      assignments.set(track.targetId, measurement);
+      assignedEchoes.add(measurement.id);
+    }
+  });
 
   for (const track of activeTracks) {
     const measurement = assignments.get(track.targetId);
