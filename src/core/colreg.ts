@@ -37,6 +37,8 @@ export interface ColregEnvironment {
   trafficSeparationScheme: boolean;
   ownCrossingTrafficLane?: boolean;
   ownInshoreTrafficZone?: boolean;
+  targetFollowingTrafficLane?: boolean;
+  targetCanOnlyNavigateChannel?: boolean;
   windDirectionKnown?: boolean;
   riskDcpaNm?: number;
 }
@@ -174,12 +176,17 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
   return environment;
 }
 
+function isPowerDriven(profile: ColregVesselProfile): boolean {
+  return profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
+    (profile.kind === "fishing" && !profile.engagedInFishing) ||
+    (profile.kind === "sailing" && profile.underSailAndPower);
+}
+
 function profileRank(profile: ColregVesselProfile): number | null {
   if (profile.kind === "nuc" || profile.kind === "ram") return 3;
   if (profile.kind === "fishing" && profile.engagedInFishing) return 2;
-  if (profile.kind === "sailing") return 1;
-  if (profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
-      (profile.kind === "fishing" && !profile.engagedInFishing)) return 0;
+  if (profile.kind === "sailing" && !profile.underSailAndPower) return 1;
+  if (isPowerDriven(profile)) return 0;
   return null;
 }
 
@@ -267,6 +274,17 @@ export function assessColregEncounter(
       duty: "Держитесь ближе к правой внешней границе фарватера, насколько это безопасно и практически возможно. Не затрудняйте проход судну, которое может безопасно идти только в пределах канала; пересекайте канал только если не создаёте помех.",
       status: "applies",
     });
+    if (target && (ownProfile.lengthM ?? 50) < 20 || ownProfile.kind === "sailing" ||
+        (ownProfile.kind === "fishing" && ownProfile.engagedInFishing)) {
+      if (environment.targetCanOnlyNavigateChannel) {
+        addDuty(applicableRules, {
+          rule: 9,
+          title: "Малое судно / парусное / рыболовное",
+          duty: "Ваше судно не должно затруднять проход судна, которое может безопасно идти только в узком проходе или фарватере.",
+          status: "conditional",
+        });
+      }
+    }
   }
   if (environment.trafficSeparationScheme) {
     addDuty(applicableRules, {
@@ -283,7 +301,7 @@ export function assessColregEncounter(
         status: "conditional",
       });
     }
-    if (environment.ownInshoreTrafficZone) {
+    if (environment.targetFollowingTrafficLane && (ownProfile.kind === "fishing" && ownProfile.engagedInFishing || ownProfile.kind === "sailing" || (ownProfile.lengthM ?? 50) < 20)) {\n      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });\n    }\n    if (environment.ownInshoreTrafficZone) {
       addDuty(applicableRules, {
         rule: 10,
         title: "Прибрежная зона движения",
@@ -313,7 +331,7 @@ export function assessColregEncounter(
     });
 
     if (ownProfile.underway && targetProfile.underway &&
-        ownProfile.kind === "sailing" && targetProfile.kind === "sailing" && hasRisk) {
+        ownProfile.kind === "sailing" && targetProfile.kind === "sailing" &&\n        !ownProfile.underSailAndPower && !targetProfile.underSailAndPower && hasRisk) {
       encounter = "sailing-meeting";
       primaryRule = 12;
       title = "Сближение двух парусных судов";
@@ -353,7 +371,7 @@ export function assessColregEncounter(
         responsibility = "stand-on";
         ownShipDuty = "Цель, вероятно, является обгоняющей и обязана держаться в стороне. Сохраняйте курс и скорость, если нет оснований действовать по правилу 17 или другим правилам; не мешайте обгону.";
       } else if (ownProfile.underway && targetProfile.underway && hasRisk &&
-                 ownProfile.kind === "power-driven" && targetProfile.kind === "power-driven" &&
+                 isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
                  Math.abs(180 - courseDifference) <= (options.headOnCourseToleranceDeg ?? 15) &&
                  Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10) &&
                  Math.min(targetRelativeBearing, 360 - targetRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10)) {
@@ -362,7 +380,7 @@ export function assessColregEncounter(
         title = "Вероятная ситуация встречного сближения";
         responsibility = "give-way";
         ownShipDuty = "Правило 14: если действительно наблюдается встречное или почти встречное сближение двух механических судов, измените курс вправо, чтобы пройти левыми бортами. При сомнении считайте ситуацию встречной.";
-      } else if (ownProfile.kind === "power-driven" && targetProfile.kind === "power-driven" &&
+      } else if (isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
                  hasRisk && isForwardSector(ownRelativeBearing) &&
                  ownRelativeBearing > 0 && ownRelativeBearing < 112.5) {
         encounter = "crossing-starboard";
