@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
-import { courseVectorToRadar, projectRelativePosition } from "../core/radar";
+import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
@@ -46,6 +46,7 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [eblBearingDeg, setEblBearingDeg] = useState(0);
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
+  const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
@@ -170,6 +171,7 @@ export default function App() {
       <div className="main-grid">
         <section className="panel radar-panel">
           <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · VECTOR 6 MIN</span></div>
+          <div className="vector-mode-control"><span>ВЕКТОРЫ ЦЕЛЕЙ</span><div><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>Истинные</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>Относительные</button></div></div>
           <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
             {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
@@ -180,7 +182,7 @@ export default function App() {
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
             {targets.map((target) => {
               const point = projectRelativePosition(ownVessel, target, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
-              const vector = courseVectorToRadar(target.courseDeg, target.speedKn, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX);
+              const vector = motionVectorToRadar(ownVessel, target, vectorMode, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX);
               const vectorLength = Math.hypot(vector.dx, vector.dy);
               const unitX = vectorLength > 0 ? vector.dx / vectorLength : 0;
               const unitY = vectorLength > 0 ? vector.dy / vectorLength : 0;
