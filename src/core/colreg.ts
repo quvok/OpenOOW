@@ -39,6 +39,7 @@ export interface ColregEnvironment {
   ownInshoreTrafficZone?: boolean;
   targetFollowingTrafficLane?: boolean;
   targetCanOnlyNavigateChannel?: boolean;
+  targetNavigatingChannel?: boolean;
   targetWindwardOfOwn?: boolean | null;
   ownOvertakingNotClear?: boolean;
   targetOvertakingNotClear?: boolean;
@@ -237,6 +238,9 @@ function classifyRule18(
       duty: "Судно ограничено своей осадкой. Другие суда, кроме NUC/RAM, должны по возможности не затруднять его безопасный проход; это не даёт автоматического права требовать уступить дорогу во всех ситуациях.",
     };
   }
+  if (own.kind === "constrained-draught" && target.kind === "constrained-draught") {
+    return { responsibility: "undetermined", duty: "Оба судна ограничены своей осадкой. Правило 18 не устанавливает приоритет между ними; каждое должно учитывать условия и не затруднять безопасное движение другого." };
+  }
   if (target.kind === "constrained-draught" && own.kind !== "nuc" && own.kind !== "ram") {
     return {
       responsibility: "no-specific-duty",
@@ -287,6 +291,13 @@ export function assessColregEncounter(
   const courseDifference = Math.abs(signedAngle(target.courseDeg - own.courseDeg));
   const closing = closingSpeed(own, target, bearing);
   const cpa = calculateCpa(own, target);
+  const headOnCourseTolerance = options.headOnCourseToleranceDeg ?? 15;
+  const headOnBearingTolerance = options.headOnBearingToleranceDeg ?? 10;
+  if (![headOnCourseTolerance, headOnBearingTolerance].every(Number.isFinite) ||
+      headOnCourseTolerance < 0 || headOnCourseTolerance > 45 ||
+      headOnBearingTolerance < 0 || headOnBearingTolerance > 45) {
+    throw new RangeError("Head-on tolerances must be between 0 and 45 degrees.");
+  }
   const riskLimit = environment.riskDcpaNm ?? 0.5;
   const cpaRisk: ColregAssessment["collisionRisk"] = !cpa || cpa.tcpaMin <= 0
     ? "undetermined"
@@ -308,26 +319,32 @@ export function assessColregEncounter(
     addDuty(applicableRules, {
       rule: 9,
       title: "Узкий проход",
-      duty: "Держитесь ближе к правой внешней границе фарватера, насколько это безопасно и практически возможно. Не затрудняйте проход судну, которое может безопасно идти только в пределах канала; пересекайте канал только если не создаёте помех.",
+      duty: "Держитесь ближе к правой внешней границе фарватера, насколько это безопасно и практически возможно. Не затрудняйте проход судну, которое может безопасно идти только в пределах канала; пересекайте канал только если не создаёте помех. По возможности избегайте постановки на якорь в узком проходе.",
       status: "applies",
     });
-    if ((ownProfile.lengthM ?? 50) < 20 || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) ||
-        (ownProfile.kind === "fishing" && ownProfile.engagedInFishing)) {
-      if (environment.targetCanOnlyNavigateChannel) {
-        addDuty(applicableRules, {
-          rule: 9,
-          title: "Малое судно / парусное / рыболовное",
-          duty: "Ваше судно не должно затруднять проход судна, которое может безопасно идти только в узком проходе или фарватере.",
-          status: "conditional",
-        });
-      }
+    if (((ownProfile.lengthM ?? 50) < 20 || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower)) &&
+        environment.targetCanOnlyNavigateChannel) {
+      addDuty(applicableRules, {
+        rule: 9,
+        title: "Малое судно / парусное",
+        duty: "Ваше судно не должно затруднять проход судна, которое может безопасно идти только в узком проходе или фарватере.",
+        status: "conditional",
+      });
+    }
+    if (ownProfile.kind === "fishing" && ownProfile.engagedInFishing && environment.targetNavigatingChannel) {
+      addDuty(applicableRules, {
+        rule: 9,
+        title: "Рыболовное судно в узком проходе",
+        duty: "Судно, занятое ловом рыбы, не должно затруднять проход любого другого судна, следующего в узком проходе или фарватере.",
+        status: "conditional",
+      });
     }
   }
   if (environment.trafficSeparationScheme) {
     addDuty(applicableRules, {
       rule: 10,
       title: "Система разделения движения",
-      duty: "Следуйте полосой в общем направлении потока; избегайте разделительной полосы и зоны разделения. Если пересекаете полосу, делайте это по возможности под прямым углом; не затрудняйте движение судна, следующего по полосе.",
+      duty: "Следуйте полосой в общем направлении потока; избегайте разделительной полосы и зоны разделения. Если пересекаете полосу, делайте это по возможности под прямым углом; не затрудняйте движение судна, следующего по полосе. Не входите в зону разделения и не становитесь на якорь в TSS без предусмотренной правилами необходимости.",
       status: "applies",
     });
     if (environment.ownCrossingTrafficLane) {
@@ -383,7 +400,7 @@ export function assessColregEncounter(
           ? "Судно левым галсом должно держаться в стороне от судна правым галсом."
           : "Судно правым галсом сохраняет курс и скорость; наблюдайте за выполнением обязанности другим судном и будьте готовы действовать.";
       } else if (ownProfile.tack === targetProfile.tack && ownProfile.tack !== "unknown" &&
-                 ownProfile.windward !== null && targetProfile.windward !== null) {
+                 ownProfile.windward !== null && targetProfile.windward !== null && ownProfile.windward !== targetProfile.windward) {
         responsibility = ownProfile.windward ? "give-way" : "stand-on";
         ownShipDuty = ownProfile.windward
           ? "На одном галсе наветренное судно должно держаться в стороне от подветренного."
@@ -397,11 +414,11 @@ export function assessColregEncounter(
       }
       applicableRules.push({ rule: 12, title: "Парусные суда", duty: ownShipDuty, status: "applies" });
     } else {
-      const ownOvertaking = environment.ownOvertakingNotClear === true ||
-        (ownProfile.underway && targetProfile.underway && isAbaftBeam(targetRelativeBearing) && closing > 0.05);
-      const targetOvertaking = environment.targetOvertakingNotClear === true ||
-        (ownProfile.underway && targetProfile.underway && isAbaftBeam(ownRelativeBearing) && closing > 0.05);
-      if (ownOvertaking) {
+      const ownOvertaking = ownProfile.underway && targetProfile.underway && (environment.ownOvertakingNotClear === true || (isAbaftBeam(targetRelativeBearing) && closing > 0.05));
+      const targetOvertaking = ownProfile.underway && targetProfile.underway && (environment.targetOvertakingNotClear === true || (isAbaftBeam(ownRelativeBearing) && closing > 0.05));
+      if (ownOvertaking && targetOvertaking) {
+        ownShipDuty = "Оба признака обгона отмечены одновременно. Проверьте идентификацию целей и историю сближения; не назначайте обязанность автоматически.";
+      } else if (ownOvertaking) {
         encounter = "overtaking-own";
         primaryRule = 13;
         title = "Собственное судно, вероятно, обгоняет цель";
@@ -415,8 +432,8 @@ export function assessColregEncounter(
         ownShipDuty = "Цель, вероятно, является обгоняющей и обязана держаться в стороне. Сохраняйте курс и скорость, если нет оснований действовать по правилу 17 или другим правилам; не мешайте обгону.";
       } else if (ownProfile.underway && targetProfile.underway && hasRisk &&
                  isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
-                 Math.abs(180 - courseDifference) <= (options.headOnCourseToleranceDeg ?? 15) &&
-                 Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10) &&
+                 Math.abs(180 - courseDifference) <= headOnCourseTolerance &&
+                 Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= headOnBearingTolerance &&
                  Math.min(targetRelativeBearing, 360 - targetRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10)) {
         encounter = "head-on";
         primaryRule = 14;
