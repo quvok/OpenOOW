@@ -214,7 +214,7 @@ describe("COLREG context and encounter assessment", () => {
 
 
   it("keeps an overtaking obligation active until the vessels are finally past and clear", () => {
-    const result = assessColregEncounter(own(), target(0, 2, 180, 10), {
+    const result = assessColregEncounter(own(), target(0, 2, 0, 10), {
       environment: { ownOvertakingNotClear: true },
     });
     expect(result.primaryRule).toBe(13);
