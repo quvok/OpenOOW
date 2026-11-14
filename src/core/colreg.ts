@@ -27,6 +27,7 @@ export interface ColregVesselProfile {
   windward?: boolean | null;
   engagedInFishing?: boolean;
   underSailAndPower?: boolean;
+  wigOnSurface?: boolean;
 }
 
 export interface ColregEnvironment {
@@ -220,6 +221,7 @@ function isPowerDriven(profile: ColregVesselProfile): boolean {
 }
 
 function profileRank(profile: ColregVesselProfile): number | null {
+  if (profile.kind === "wig-craft" && !profile.wigOnSurface) return -1;
   if (profile.kind === "nuc" || profile.kind === "ram") return 3;
   if (profile.kind === "fishing" && profile.engagedInFishing) return 2;
   if (profile.kind === "sailing" && !profile.underSailAndPower) return 1;
