@@ -85,6 +85,8 @@ export default function App() {
   const [colregTargetFishing, setColregTargetFishing] = useState(false);
   const [colregOwnMotorUnderSail, setColregOwnMotorUnderSail] = useState(false);
   const [colregTargetMotorUnderSail, setColregTargetMotorUnderSail] = useState(false);
+  const [colregOwnLengthM, setColregOwnLengthM] = useState(50);
+  const [colregTargetLengthM, setColregTargetLengthM] = useState(50);
   const [colregOwnTack, setColregOwnTack] = useState<Tack>("unknown");
   const [colregTargetTack, setColregTargetTack] = useState<Tack>("unknown");
   const [colregOwnWindward, setColregOwnWindward] = useState("unknown");
@@ -96,6 +98,8 @@ export default function App() {
   const [colregTss, setColregTss] = useState(false);
   const [colregCrossingTss, setColregCrossingTss] = useState(false);
   const [colregTargetFollowingLane, setColregTargetFollowingLane] = useState(false);
+  const [colregTargetChannelLimited, setColregTargetChannelLimited] = useState(false);
+  const [colregOwnInshoreZone, setColregOwnInshoreZone] = useState(false);
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
@@ -193,12 +197,31 @@ export default function App() {
     shipRef.current = nextShip;
     setShip(nextShip);
     setActiveScenario(scenario);
-    setColregVisibility(scenario.visibilityNm <= 2 ? "restricted" : "good");
-    setColregVesselsInSight(scenario.visibilityNm > 2);
-    setColregNarrowChannel(false);
-    setColregTss(false);
-    setColregCrossingTss(false);
-    setColregTargetFollowingLane(false);
+    const colregContext = scenario.colregContext;
+    const ownContext = colregContext?.ownProfile;
+    const targetContext = colregContext?.targetProfile;
+    const environmentContext = colregContext?.environment;
+    setColregOwnKind(ownContext?.kind ?? "power-driven");
+    setColregTargetKind(targetContext?.kind ?? "power-driven");
+    setColregOwnFishing(ownContext?.engagedInFishing ?? false);
+    setColregTargetFishing(targetContext?.engagedInFishing ?? false);
+    setColregOwnMotorUnderSail(ownContext?.underSailAndPower ?? false);
+    setColregTargetMotorUnderSail(targetContext?.underSailAndPower ?? false);
+    setColregOwnTack(ownContext?.tack ?? "unknown");
+    setColregTargetTack(targetContext?.tack ?? "unknown");
+    setColregOwnWindward(ownContext?.windward == null ? "unknown" : ownContext.windward ? "yes" : "no");
+    setColregTargetWindward(targetContext?.windward == null ? "unknown" : targetContext.windward ? "yes" : "no");
+    setColregOwnLengthM(ownContext?.lengthM ?? 50);
+    setColregTargetLengthM(targetContext?.lengthM ?? 50);
+    setColregVisibility(environmentContext?.visibility ?? (scenario.visibilityNm <= 2 ? "restricted" : "good"));
+    setColregVesselsInSight(environmentContext?.vesselsInSight ?? scenario.visibilityNm > 2);
+    setColregDaylight(environmentContext?.daylight ?? false);
+    setColregNarrowChannel(environmentContext?.narrowChannel ?? false);
+    setColregTss(environmentContext?.trafficSeparationScheme ?? false);
+    setColregCrossingTss(environmentContext?.ownCrossingTrafficLane ?? false);
+    setColregTargetFollowingLane(environmentContext?.targetFollowingTrafficLane ?? false);
+    setColregTargetChannelLimited(environmentContext?.targetCanOnlyNavigateChannel ?? false);
+    setColregOwnInshoreZone(environmentContext?.ownInshoreTrafficZone ?? false);
     setTrialCourseDeg(scenario.ownShip.courseDeg);
     setTrialSpeedKn(scenario.ownShip.speedKn);
     const nextTargets = scenario.targets.map((target) => ({ ...target }));
@@ -271,9 +294,9 @@ export default function App() {
     : null;
   const colregAssessment = selectedColregTarget
     ? assessColregEncounter(ownVessel, selectedColregTarget, {
-        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes" },
-        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes" },
-        environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, riskDcpaNm: alertDcpaNm },
+        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes", lengthM: colregOwnLengthM },
+        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes", lengthM: colregTargetLengthM },
+        environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, ownInshoreTrafficZone: colregOwnInshoreZone, riskDcpaNm: alertDcpaNm },
       })
     : null;
   const colregManeuver = selectedColregTarget
@@ -455,14 +478,16 @@ export default function App() {
               <div className="colreg-context-grid">
                 <label><span>Собственное судно</span><select value={colregOwnKind} onChange={(event) => setColregOwnKind(event.target.value as ColregVesselKind)}>{COLREG_VESSEL_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
                 <label><span>Цель</span><select value={colregTargetKind} onChange={(event) => setColregTargetKind(event.target.value as ColregVesselKind)}>{COLREG_VESSEL_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+                <label><span>Длина своего судна, м</span><input className="colreg-number" type="number" min="1" max="400" value={colregOwnLengthM} onChange={(event) => setColregOwnLengthM(Math.max(1, Math.min(400, Number(event.target.value) || 1)))}/></label>
+                <label><span>Длина цели, м</span><input className="colreg-number" type="number" min="1" max="400" value={colregTargetLengthM} onChange={(event) => setColregTargetLengthM(Math.max(1, Math.min(400, Number(event.target.value) || 1)))}/></label>
                 {colregOwnKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnFishing} onChange={(event) => setColregOwnFishing(event.target.checked)}/><span>Собственное судно занято ловом рыбы</span></label>}
                 {colregTargetKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetFishing} onChange={(event) => setColregTargetFishing(event.target.checked)}/><span>Цель занята ловом рыбы</span></label>}
                 {colregOwnKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnMotorUnderSail} onChange={(event) => setColregOwnMotorUnderSail(event.target.checked)}/><span>Двигатель работает под парусами</span></label>}
                 {colregTargetKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetMotorUnderSail} onChange={(event) => setColregTargetMotorUnderSail(event.target.checked)}/><span>Двигатель цели работает под парусами</span></label>}
                 {colregOwnKind === "sailing" && !colregOwnMotorUnderSail && <label><span>Галс своего судна</span><select value={colregOwnTack} onChange={(event) => setColregOwnTack(event.target.value as Tack)}><option value="unknown">Не определён</option><option value="port">Левый галс</option><option value="starboard">Правый галс</option></select></label>}
                 {colregTargetKind === "sailing" && !colregTargetMotorUnderSail && <label><span>Галс цели</span><select value={colregTargetTack} onChange={(event) => setColregTargetTack(event.target.value as Tack)}><option value="unknown">Не определён</option><option value="port">Левый галс</option><option value="starboard">Правый галс</option></select></label>}
-                {colregOwnKind === "sailing" && !colregOwnMotorUnderSail && colregOwnTack === colregTargetTack && <label><span>Своё судно наветренное?</span><select value={colregOwnWindward} onChange={(event) => setColregOwnWindward(event.target.value)}><option value="unknown">Неизвестно</option><option value="yes">Да</option><option value="no">Нет</option></select></label>}
-                {colregTargetKind === "sailing" && !colregTargetMotorUnderSail && colregOwnTack === colregTargetTack && <label><span>Цель наветренная?</span><select value={colregTargetWindward} onChange={(event) => setColregTargetWindward(event.target.value)}><option value="unknown">Неизвестно</option><option value="yes">Да</option><option value="no">Нет</option></select></label>}
+                {colregOwnKind === "sailing" && !colregOwnMotorUnderSail && colregOwnTack !== "unknown" && colregOwnTack === colregTargetTack && <label><span>Своё судно наветренное?</span><select value={colregOwnWindward} onChange={(event) => setColregOwnWindward(event.target.value)}><option value="unknown">Неизвестно</option><option value="yes">Да</option><option value="no">Нет</option></select></label>}
+                {colregTargetKind === "sailing" && !colregTargetMotorUnderSail && colregOwnTack !== "unknown" && colregOwnTack === colregTargetTack && <label><span>Цель наветренная?</span><select value={colregTargetWindward} onChange={(event) => setColregTargetWindward(event.target.value)}><option value="unknown">Неизвестно</option><option value="yes">Да</option><option value="no">Нет</option></select></label>}
               </div>
               <div className="colreg-context-heading">УСЛОВИЯ НАВИГАЦИИ</div>
               <div className="colreg-context-grid">
@@ -470,9 +495,11 @@ export default function App() {
                 <label><span>Суда на виду?</span><select value={colregVesselsInSight ? "yes" : "no"} onChange={(event) => setColregVesselsInSight(event.target.value === "yes")}><option value="yes">Да, визуальный контакт</option><option value="no">Нет, обнаружение радаром</option></select></label>
                 <label><span>Время суток</span><select value={colregDaylight ? "day" : "night"} onChange={(event) => setColregDaylight(event.target.value === "day")}><option value="night">Ночь</option><option value="day">День</option></select></label>
                 <label className="colreg-check"><input type="checkbox" checked={colregNarrowChannel} onChange={(event) => setColregNarrowChannel(event.target.checked)}/><span>Узкий проход / фарватер (правило 9)</span></label>
+                {colregNarrowChannel && <label className="colreg-check"><input type="checkbox" checked={colregTargetChannelLimited} onChange={(event) => setColregTargetChannelLimited(event.target.checked)}/><span>Цель может безопасно идти только в канале</span></label>}
                 <label className="colreg-check"><input type="checkbox" checked={colregTss} onChange={(event) => setColregTss(event.target.checked)}/><span>Система разделения движения (правило 10)</span></label>
                 {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregCrossingTss} onChange={(event) => setColregCrossingTss(event.target.checked)}/><span>Собственное судно пересекает полосу</span></label>}
                 {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregTargetFollowingLane} onChange={(event) => setColregTargetFollowingLane(event.target.checked)}/><span>Цель следует по полосе движения</span></label>}
+                {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregOwnInshoreZone} onChange={(event) => setColregOwnInshoreZone(event.target.checked)}/><span>Своё судно в прибрежной зоне движения</span></label>}
               </div>
             </div>
             {colregAssessment ? <>
