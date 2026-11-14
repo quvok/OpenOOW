@@ -216,7 +216,7 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
 function isPowerDriven(profile: ColregVesselProfile): boolean {
   return (profile.kind === "wig-craft" && profile.wigOnSurface === true) || (profile.kind === "seaplane" && profile.seaplaneOnWater === true) || profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
     (profile.kind === "fishing" && !profile.engagedInFishing) ||
-    (profile.kind === "sailing" && profile.underSailAndPower);
+    (profile.kind === "sailing" && profile.underSailAndPower === true);
 }
 
 function profileRank(profile: ColregVesselProfile): number | null {
