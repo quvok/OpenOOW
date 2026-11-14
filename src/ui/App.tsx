@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Anchor, Gauge, RotateCcw, Ship, Waves } from "lucide-react";
+import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
+import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
 const STEP_SECONDS = 0.1;
-const RADAR_RANGE_NM = 1.5;
+const RADAR_RANGE_NM = 3;
 
 function formatTime(seconds: number) {
   const total = Math.floor(seconds);
@@ -12,14 +13,33 @@ function formatTime(seconds: number) {
   return pad(Math.floor(total / 3600)) + ":" + pad(Math.floor((total % 3600) / 60)) + ":" + pad(total % 60);
 }
 
+function formatMinutes(minutes: number | null) {
+  if (minutes === null || !Number.isFinite(minutes)) return "—";
+  const sign = minutes < 0 ? "−" : "";
+  const absolute = Math.abs(minutes);
+  return sign + Math.floor(absolute) + "m " + Math.round((absolute % 1) * 60) + "s";
+}
+
+function createScenarioShipState(scenario: EncounterScenario): ShipDynamicsState {
+  const throttlePercent = (scenario.ownShip.speedKn / 15) * 100;
+  return {
+    ...INITIAL_SHIP_STATE,
+    headingDeg: scenario.ownShip.courseDeg,
+    speedKn: scenario.ownShip.speedKn,
+    throttlePercent
+  };
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return <div className="metric"><span>{label}</span><b>{value}</b></div>;
 }
 
 export default function App() {
-  const [ship, setShip] = useState<ShipDynamicsState>(INITIAL_SHIP_STATE);
+  const [selectedScenarioId, setSelectedScenarioId] = useState(ENCOUNTER_SCENARIOS[0].id);
+  const [activeScenario, setActiveScenario] = useState<EncounterScenario>(ENCOUNTER_SCENARIOS[0]);
+  const [ship, setShip] = useState<ShipDynamicsState>(() => createScenarioShipState(ENCOUNTER_SCENARIOS[0]));
   const [running, setRunning] = useState(false);
-  const shipRef = useRef<ShipDynamicsState>(INITIAL_SHIP_STATE);
+  const shipRef = useRef<ShipDynamicsState>(ship);
   const accumulatorRef = useRef(0);
 
   const updateShip = (update: (current: ShipDynamicsState) => ShipDynamicsState) => {
@@ -61,15 +81,28 @@ export default function App() {
     return () => window.cancelAnimationFrame(frameId);
   }, [running]);
 
+  const loadScenario = () => {
+    const scenario = ENCOUNTER_SCENARIOS.find((item) => item.id === selectedScenarioId);
+    if (!scenario) return;
+    setRunning(false);
+    accumulatorRef.current = 0;
+    const nextShip = createScenarioShipState(scenario);
+    shipRef.current = nextShip;
+    setShip(nextShip);
+    setActiveScenario(scenario);
+  };
+
   const reset = () => {
     setRunning(false);
     accumulatorRef.current = 0;
-    shipRef.current = INITIAL_SHIP_STATE;
-    setShip(INITIAL_SHIP_STATE);
+    const resetShip = createScenarioShipState(activeScenario);
+    shipRef.current = resetShip;
+    setShip(resetShip);
   };
 
   const x = 250 + (ship.eastNm / RADAR_RANGE_NM) * 220;
   const y = 250 - (ship.northNm / RADAR_RANGE_NM) * 220;
+  const targetCpa = getScenarioTargetCpa(activeScenario);
 
   return <main className="app-shell">
     <aside className="sidebar">
@@ -78,25 +111,54 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.3.0</div>
+      <div className="sidebar-foot">SIM CORE · 0.4.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
-        <div><div className="eyebrow">OPENOOW / ПРОТОТИП</div><h1>Динамика собственного судна</h1></div>
+        <div><div className="eyebrow">OPENOOW / УЧЕБНЫЙ РЕЖИМ</div><h1>Расхождение с судами</h1></div>
         <div className={running ? "status live" : "status"}><i/>{running ? "СИМУЛЯЦИЯ ЗАПУЩЕНА" : "ПАУЗА"}</div>
       </header>
+      <section className="panel scenario-picker">
+        <div className="scenario-picker-top">
+          <div><span className="eyebrow">УЧЕБНЫЕ СИТУАЦИИ</span><h2>Выбор сценария</h2></div>
+          <span className="unit">{ENCOUNTER_SCENARIOS.length} СЦЕНАРИЕВ</span>
+        </div>
+        <div className="scenario-select-row">
+          <select aria-label="Выбрать сценарий" value={selectedScenarioId} onChange={(event) => setSelectedScenarioId(event.target.value)}>
+            {ENCOUNTER_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.title}</option>)}
+          </select>
+          <button className="primary" onClick={loadScenario}>Загрузить</button>
+        </div>
+        <div className="scenario-description">
+          <b>{activeScenario.title}</b><span>{activeScenario.category}</span>
+          <p>{activeScenario.description}</p>
+          <p><strong>Задача:</strong> {activeScenario.task}</p>
+          <p><strong>Нормативная основа:</strong> {activeScenario.ruleReference}</p>
+          <div className="scenario-facts"><span>Собственный курс: {activeScenario.ownShip.courseDeg.toFixed(0)}° T</span><span>Скорость: {activeScenario.ownShip.speedKn.toFixed(1)} kn</span><span>Видимость: {activeScenario.visibilityNm.toFixed(1)} NM</span></div>
+        </div>
+      </section>
       <div className="main-grid">
         <section className="panel radar-panel">
-          <div className="panel-heading"><div><span className="eyebrow">ВИД СВЕРХУ</span><h2>Положение судна</h2></div><span className="unit">NORTH UP · 1.5 NM</span></div>
-          <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Положение и курс собственного судна">
+          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM</span></div>
+          <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
-            {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)}
+            {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
+            }
             <path d="M250 15V485 M15 250H485" className="radar-cross"/>
             <path d={"M250 250 L" + x + " " + y} className="track-line"/>
+            {activeScenario.targets.map((target) => {
+              const tx = 250 + (target.xNm / RADAR_RANGE_NM) * 220;
+              const ty = 250 - (target.yNm / RADAR_RANGE_NM) * 220;
+              return <g key={target.id} transform={"translate(" + tx + " " + ty + ")"}>
+                <circle r="8" className="target-echo"/>
+                <path d="M0 -19 L0 -9 M-5 -14 L0 -19 L5 -14" className="target-course"/>
+                <text x="12" y="4">{target.id}</text>
+              </g>;
+            })}
             <g transform={"translate(" + x + " " + y + ") rotate(" + ship.headingDeg + ")"}><path d="M0 -18 L10 15 L0 9 L-10 15 Z" className="own-ship"/></g>
             <text x="260" y="28">N</text><text x="260" y="270">OWN SHIP</text>
           </svg>
-          <div className="radar-legend"><span><i className="dot own-dot"/>Собственное судно</span><span>Шкала: ±1.5 NM</span></div>
+          <div className="radar-legend"><span><i className="dot own-dot"/>Собственное судно</span><span><i className="dot target-dot"/>Цели</span><span>Шкала: 3 NM</span></div>
         </section>
         <div className="control-column">
           <section className="panel">
@@ -129,7 +191,18 @@ export default function App() {
           </section>
         </div>
       </div>
-      <div className="notice"><b>О модели:</b> расчёт выполняется ядром с фиксированным шагом 0,1 с. Интерфейс только передаёт команды и отображает состояние. Динамика остаётся упрощённой кинематической моделью, не полноценной гидродинамикой и не навигационным прибором.</div>
+      <section className="panel cpa-panel">
+        <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ ПО ИСХОДНЫМ ДАННЫМ</span><h2>Оценка целей до начала манёвра</h2></div><Target size={18}/></div>
+        <div className="cpa-table-wrap"><table className="cpa-table"><thead><tr><th>Цель</th><th>Пеленг</th><th>Дистанция</th><th>TCPA</th><th>DCPA</th></tr></thead><tbody>
+          {targetCpa.map(({target,cpa}) => <tr key={target.id}><td>{target.id}</td><td>{cpa ? cpa.bearingDeg.toFixed(1) + "°" : "—"}</td><td>{cpa ? cpa.rangeNm.toFixed(2) + " NM" : "—"}</td><td>{cpa ? formatMinutes(cpa.tcpaMin) : "—"}</td><td>{cpa ? cpa.dcpaNm.toFixed(2) + " NM" : "—"}</td></tr>)}
+        </tbody></table></div>
+        <p className="cpa-note">CPA/TCPA рассчитаны по постоянным исходным курсам и скоростям до манёвра. Таблица не обновляет векторы цели и не является ARPA. После изменения курса или скорости собственного судна расчёт будет обновлён в следующих версиях.</p>
+      </section>
+      <section className="panel debrief-panel">
+        <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
+        <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
+      </section>
+      <div className="notice"><b>Ограничение учебной модели:</b> цели пока неподвижны относительно заданной схемы, а их CPA/TCPA показывают только исходный прогноз по постоянным векторам. Динамическое движение целей, ARPA-сопровождение и автоматическая оценка действий ещё не реализованы. Сценарии предназначены для тренировки распознавания ситуации, а не для реального судовождения.</div>
     </section>
   </main>;
 }
