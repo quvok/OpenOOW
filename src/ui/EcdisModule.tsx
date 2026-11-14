@@ -262,6 +262,7 @@ ${points}
         </svg>
         <div className="ecdis-map-legend"><span><i className="ecdis-legend-own"/>Своё судно</span><span><i className="ecdis-legend-target"/>Цель</span><span><i className="ecdis-legend-route"/>Маршрут</span><span><i className="ecdis-legend-danger"/>Опасность</span><span><i className="ecdis-legend-shallow"/>Малая глубина</span></div>
         <div className="ecdis-map-actions">
+          <button type="button" className="ecdis-tool" onClick={() => chartFileInput.current?.click()}>ЗАГРУЗИТЬ GEOJSON</button>{importedChart && <button type="button" className="ecdis-tool" onClick={() => {setImportedChart(null);setStatusMessage("Возвращена учебная карта.");}}>УЧЕБНАЯ КАРТА</button>}<input ref={chartFileInput} type="file" accept=".geojson,.json,application/geo+json,application/json" hidden onChange={importChartGeoJson}/>
           <button type="button" className="ecdis-tool" onClick={() => setHeadUp((value)=>!value)}>{headUp ? "HEAD UP" : "NORTH UP"}</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.min(1.6,Number((value+0.1).toFixed(1))))}>УВЕЛИЧИТЬ</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.max(0.7,Number((value-0.1).toFixed(1))))}>УМЕНЬШИТЬ</button>
