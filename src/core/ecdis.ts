@@ -348,8 +348,8 @@ export function classifyDepth(
 
 export function fromGeographicPosition(position: GeoOrigin, origin: GeoOrigin): LocalPosition {
   const northNm = (position.latitudeDeg - origin.latitudeDeg) * 60;
-  const meanLatitudeRad = ((position.latitudeDeg + origin.latitudeDeg) / 2) * DEG_TO_RAD;
+  const originLatitudeRad = origin.latitudeDeg * DEG_TO_RAD;
   const eastNm = normalizeLongitude(position.longitudeDeg - origin.longitudeDeg) * 60 *
-    Math.max(0.01, Math.cos(meanLatitudeRad));
+    Math.max(0.01, Math.cos(originLatitudeRad));
   return { eastNm, northNm };
 }
