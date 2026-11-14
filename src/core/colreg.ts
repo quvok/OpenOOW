@@ -155,7 +155,12 @@ function isForwardSector(relativeBearing: number): boolean {
 }
 
 function normalizeProfile(profile: Partial<ColregVesselProfile> | undefined): ColregVesselProfile {
-  return { ...defaultProfile, ...profile };
+  const normalized = { ...defaultProfile, ...profile };
+  if (normalized.kind === "anchored" || normalized.kind === "aground") {
+    normalized.underway = false;
+    normalized.makingWay = false;
+  }
+  return normalized;
 }
 
 function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironment {
@@ -169,11 +174,12 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
   return environment;
 }
 
-function profileRank(kind: ColregVesselKind): number | null {
-  if (kind === "nuc" || kind === "ram") return 3;
-  if (kind === "fishing") return 2;
-  if (kind === "sailing") return 1;
-  if (kind === "power-driven" || kind === "pilot" || kind === "towing") return 0;
+function profileRank(profile: ColregVesselProfile): number | null {
+  if (profile.kind === "nuc" || profile.kind === "ram") return 3;
+  if (profile.kind === "fishing" && profile.engagedInFishing) return 2;
+  if (profile.kind === "sailing") return 1;
+  if (profile.kind === "power-driven" || profile.kind === "pilot" || profile.kind === "towing" ||
+      (profile.kind === "fishing" && !profile.engagedInFishing)) return 0;
   return null;
 }
 
@@ -197,8 +203,8 @@ function classifyRule18(
       duty: "Цель ограничена своей осадкой. Если обстоятельства позволяют, не затрудняйте её безопасный проход; не трактуйте это как безусловное освобождение цели от всех обязанностей.",
     };
   }
-  const ownRank = profileRank(own.kind);
-  const targetRank = profileRank(target.kind);
+  const ownRank = profileRank(own);
+  const targetRank = profileRank(target);
   if (ownRank === null || targetRank === null || ownRank === targetRank) {
     return {
       responsibility: "undetermined",
@@ -307,7 +313,7 @@ export function assessColregEncounter(
     });
 
     if (ownProfile.underway && targetProfile.underway &&
-        ownProfile.kind === "sailing" && targetProfile.kind === "sailing") {
+        ownProfile.kind === "sailing" && targetProfile.kind === "sailing" && hasRisk) {
       encounter = "sailing-meeting";
       primaryRule = 12;
       title = "Сближение двух парусных судов";
@@ -346,7 +352,8 @@ export function assessColregEncounter(
         title = "Цель, вероятно, обгоняет собственное судно";
         responsibility = "stand-on";
         ownShipDuty = "Цель, вероятно, является обгоняющей и обязана держаться в стороне. Сохраняйте курс и скорость, если нет оснований действовать по правилу 17 или другим правилам; не мешайте обгону.";
-      } else if (ownProfile.kind === "power-driven" && targetProfile.kind === "power-driven" &&
+      } else if (ownProfile.underway && targetProfile.underway && hasRisk &&
+                 ownProfile.kind === "power-driven" && targetProfile.kind === "power-driven" &&
                  Math.abs(180 - courseDifference) <= (options.headOnCourseToleranceDeg ?? 15) &&
                  Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10) &&
                  Math.min(targetRelativeBearing, 360 - targetRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10)) {
@@ -372,8 +379,7 @@ export function assessColregEncounter(
         ownShipDuty = "При подтверждённой ситуации пересечения цель находится слева, поэтому собственное судно обычно сохраняет курс и скорость по правилу 17. Это не освобождает от наблюдения и действий, когда этого требует правило 17.";
       } else {
         const hierarchy = classifyRule18(ownProfile, targetProfile);
-        if (hierarchy.responsibility !== "undetermined" &&
-            (ownProfile.kind !== targetProfile.kind)) {
+        if (hierarchy.responsibility !== "undetermined" && ownProfile.underway && targetProfile.underway) {
           encounter = "vessel-priority";
           primaryRule = 18;
           title = "Взаимные обязанности по статусу судов";
@@ -415,8 +421,10 @@ export function assessColregEncounter(
     });
   }
 
-  const ownLightGuidance = getVesselLightGuidance(ownProfile.kind);
-  const targetLightGuidance = getVesselLightGuidance(targetProfile.kind);
+  const ownLightBase = getVesselLightGuidance(ownProfile.kind);
+  const targetLightBase = getVesselLightGuidance(targetProfile.kind);
+  const ownLightGuidance = { ...ownLightBase, lights: [...ownLightBase.lights], dayShapes: [...ownLightBase.dayShapes], notes: [...ownLightBase.notes] };
+  const targetLightGuidance = { ...targetLightBase, lights: [...targetLightBase.lights], dayShapes: [...targetLightBase.dayShapes], notes: [...targetLightBase.notes] };
   if (ownProfile.underSailAndPower) ownLightGuidance.dayShapes.push("Чёрный конус вершиной вниз: судно идёт под парусами и одновременно использует механическую установку.");
   if (targetProfile.underSailAndPower) targetLightGuidance.dayShapes.push("Чёрный конус вершиной вниз: судно идёт под парусами и одновременно использует механическую установку.");
   const limitations = [
