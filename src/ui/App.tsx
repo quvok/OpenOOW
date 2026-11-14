@@ -281,7 +281,7 @@ export default function App() {
               if (!target) return null;
               const track = Object.values(arpaTracks).find((item) => item.associatedRadarId === measurement.id);
               const point = projectRelativePosition(ownVessel, measurement, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
-              const estimatedTarget = track?.estimatedCourseDeg !== null && track?.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
+              const estimatedTarget = track?.status === "tracking" && track.estimatedCourseDeg !== null && track.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
                 ? { courseDeg: track.estimatedCourseDeg, speedKn: track.estimatedSpeedKn }
                 : null;
               const vector = estimatedTarget
