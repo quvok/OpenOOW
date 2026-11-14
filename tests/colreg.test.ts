@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessColregEncounter, evaluateColregManeuver } from "../src/core/colreg";
 import { COLREG_RULES } from "../src/core/colregRules";
-import { getLightVisibilityMinimums, getSoundSignals, getVesselLightGuidance, LIGHT_DEFINITIONS } from "../src/core/colregSignals";
+import { getLightVisibilityMinimums, getSoundSignals, getVesselLightGuidance, getRestrictedVisibilitySignal, LIGHT_DEFINITIONS } from "../src/core/colregSignals";
 import type { VesselState } from "../src/core/navigation";
 
 const own = (courseDeg = 0, speedKn = 10, xNm = 0, yNm = 0): VesselState => ({
@@ -23,6 +23,15 @@ describe("COLREG rule reference", () => {
     for (const kind of ["power-driven", "sailing", "fishing", "nuc", "ram", "constrained-draught", "pilot", "towing", "anchored", "aground", "seaplane", "wig-craft", "other"] as const) {
       expect(getVesselLightGuidance(kind).lights.length).toBeGreaterThan(0);
     }
+  });
+
+
+  it("selects Rule 35 signals from vessel status and making-way condition", () => {
+    expect(getRestrictedVisibilitySignal({ kind: "power-driven", lengthM: 50, underway: true, makingWay: true })?.pattern).toContain("1 продолжительный");
+    expect(getRestrictedVisibilitySignal({ kind: "power-driven", lengthM: 50, underway: true, makingWay: false })?.pattern).toContain("2 продолжительных");
+    expect(getRestrictedVisibilitySignal({ kind: "nuc", lengthM: 50, underway: true, makingWay: false })?.pattern).toContain("2 коротких");
+    expect(getRestrictedVisibilitySignal({ kind: "anchored", lengthM: 50, underway: false, makingWay: false })?.meaning).toContain("якоре");
+    expect(getRestrictedVisibilitySignal({ kind: "power-driven", lengthM: 8, underway: true, makingWay: true })?.meaning).toContain("менее 12 м");
   });
 
   it("provides manoeuvring, restricted-visibility and distress signal references", () => {
