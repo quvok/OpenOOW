@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assessRoute, bearingDeg, buildRouteLegs, calculateActiveLegNavigation, calculateCrossTrackError, calculateWheelOverDistanceNm, classifyDepth, resolveActiveLegIndex,
-  chartedDepthAt, distanceNm, formatCoordinate, fromGeographicPosition, pointInPolygon, toGeographicPosition,
+  chartedDepthAt, distanceNm, formatCoordinate, fromGeographicPosition, importGeoJsonChart, pointInPolygon, toGeographicPosition,
   type RouteWaypoint,
 } from "../src/core/ecdis";
 
@@ -140,5 +140,46 @@ describe("ECDIS geographic route exchange", () => {
     const restored = fromGeographicPosition(geographic, origin);
     expect(restored.eastNm).toBeCloseTo(local.eastNm, 5);
     expect(restored.northNm).toBeCloseTo(local.northNm, 5);
+  });
+});
+
+
+describe("ECDIS GeoJSON chart ingestion", () => {
+  const origin = { latitudeDeg: 43, longitudeDeg: 132 };
+  const geo = (east: number, north: number) => {
+    const latitude = origin.latitudeDeg + north / 60;
+    const longitude = origin.longitudeDeg + east / (60 * Math.cos(origin.latitudeDeg * Math.PI / 180));
+    return [longitude, latitude];
+  };
+
+  it("imports charted depth areas, land, contours, soundings and hazards", () => {
+    const document = {
+      type: "FeatureCollection",
+      features: [
+        { type: "Feature", id: "dep-1", properties: { layer: "DEPARE", DRVAL1: 24, OBJNAM: "Deep water" },
+          geometry: { type: "Polygon", coordinates: [[geo(-1,-1), geo(1,-1), geo(1,1), geo(-1,1), geo(-1,-1)]] } },
+        { type: "Feature", id: "land-1", properties: { layer: "LNDARE", name: "Island" },
+          geometry: { type: "Polygon", coordinates: [[geo(2,2), geo(3,2), geo(3,3), geo(2,3), geo(2,2)]] } },
+        { type: "Feature", id: "contour-1", properties: { layer: "DEPCNT", VALDCO: 10 },
+          geometry: { type: "LineString", coordinates: [geo(-2,0), geo(2,0)] } },
+        { type: "Feature", id: "sounding-1", properties: { layer: "SOUNDG", VALSOU: 8.4 },
+          geometry: { type: "Point", coordinates: geo(0.2,0.2) } },
+        { type: "Feature", id: "rock-1", properties: { layer: "UWTROC", name: "Rock" },
+          geometry: { type: "Point", coordinates: geo(0.5,0.5) } },
+      ],
+    };
+    const chart = importGeoJsonChart(document, origin, "test chart");
+    expect(chart.featureCount).toBe(5);
+    expect(chart.areas.map((area) => area.kind)).toEqual(["charted", "land"]);
+    expect(chart.areas[0].depthM).toBe(24);
+    expect(chart.contours[0].depthM).toBe(10);
+    expect(chart.soundings[0].depthM).toBe(8.4);
+    expect(chart.hazards[0].name).toBe("Rock");
+    expect(chart.soundings[0].position.eastNm).toBeCloseTo(0.2, 4);
+  });
+
+  it("rejects non-FeatureCollection input and unsupported empty charts", () => {
+    expect(() => importGeoJsonChart({ type: "Feature", geometry: null }, origin)).toThrow("FeatureCollection");
+    expect(() => importGeoJsonChart({ type: "FeatureCollection", features: [] }, origin)).toThrow("поддерживаемые объекты");
   });
 });
