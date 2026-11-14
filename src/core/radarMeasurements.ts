@@ -25,7 +25,7 @@ export interface RadarScanClock {
 
 export const DEFAULT_RADAR_CONFIG: RadarMeasurementConfig = {
   scanIntervalSeconds: 2.5,
-  maximumRangeNm: 12,
+  maximumRangeNm: 3,
   rangeErrorNm: 0.01,
   bearingErrorDeg: 0.2,
   dropoutEveryScans: 17,
