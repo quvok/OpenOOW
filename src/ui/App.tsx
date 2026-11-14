@@ -4,6 +4,7 @@ import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarTrackHistory, recordRadarTracks } from "../core/radarTracks";
+import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, type ArpaTrackSet } from "../core/arpa";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
@@ -50,9 +51,11 @@ export default function App() {
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const [tracks, setTracks] = useState(() => createRadarTrackHistory(ENCOUNTER_SCENARIOS[0].targets));
+  const [arpaTracks, setArpaTracks] = useState<ArpaTrackSet>({});
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
+  const arpaTracksRef = useRef<ArpaTrackSet>({});
   const accumulatorRef = useRef(0);
 
   const updateShip = (update: (current: ShipDynamicsState) => ShipDynamicsState) => {
@@ -77,7 +80,7 @@ export default function App() {
         // Advance own ship and all traffic in one shared fixed-step clock.
         // This prevents the two sets of vessels from ever accumulating different time.
         const result = advanceFixedSteps(
-          { ownShip: shipRef.current, targets: targetsRef.current, tracks: tracksRef.current },
+          { ownShip: shipRef.current, targets: targetsRef.current, tracks: tracksRef.current, arpa: arpaTracksRef.current },
           elapsedSeconds,
           accumulatorRef.current,
           STEP_SECONDS,
@@ -144,6 +147,21 @@ export default function App() {
     setTracks(resetTracks);
   };
 
+  const acquireTarget = (targetId: string) => {
+    const target = targetsRef.current.find((item) => item.id === targetId);
+    if (!target) return;
+    const next = { ...arpaTracksRef.current, [targetId]: acquireArpaTarget(target, shipRef.current.elapsedSeconds) };
+    arpaTracksRef.current = next;
+    setArpaTracks(next);
+  };
+
+  const releaseTarget = (targetId: string) => {
+    const next = { ...arpaTracksRef.current };
+    delete next[targetId];
+    arpaTracksRef.current = next;
+    setArpaTracks(next);
+  };
+
   // North-up PPI: own ship remains at the display centre; contacts are plotted relative to it.
   const x = RADAR_CENTER;
   const y = RADAR_CENTER;
@@ -161,7 +179,7 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.8.0</div>
+      <div className="sidebar-foot">SIM CORE · 0.9.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
@@ -274,11 +292,32 @@ export default function App() {
         </div>
       </div>
       <section className="panel cpa-panel">
-        <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ В РЕАЛЬНОМ ВРЕМЕНИ</span><h2>Текущая оценка целей</h2></div><Target size={18}/></div>
+        <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ В РЕАЛЬНОМ ВРЕМЕНИ</span><h2>Геометрическая оценка без захвата</h2></div><Target size={18}/></div>
         <div className="cpa-table-wrap"><table className="cpa-table"><thead><tr><th>Цель</th><th>Пеленг</th><th>Дистанция</th><th>TCPA</th><th>DCPA</th></tr></thead><tbody>
           {targetCpa.map(({target,cpa}) => <tr key={target.id}><td>{target.id}</td><td>{cpa ? cpa.bearingDeg.toFixed(1) + "°" : "—"}</td><td>{cpa ? cpa.rangeNm.toFixed(2) + " NM" : "—"}</td><td>{cpa ? formatMinutes(cpa.tcpaMin) : "—"}</td><td>{cpa ? cpa.dcpaNm.toFixed(2) + " NM" : "—"}</td></tr>)}
         </tbody></table></div>
-        <p className="cpa-note">Позиции целей и собственного судна обновляются с фиксированным шагом 0,1 с. CPA/TCPA пересчитываются по текущим векторам при каждом кадре интерфейса. Это геометрический прогноз при сохранении текущих курсов и скоростей, а не ARPA-сопровождение и не прогноз с учётом будущих манёвров.</p>
+        <p className="cpa-note">Позиции целей и собственного судна обновляются с фиксированным шагом 0,1 с. CPA/TCPA пересчитываются по текущим векторам при каждом кадре интерфейса. Это расчёт по заданным сценарным векторам. Для оценки по измерениям используйте отдельный блок ARPA ниже.</p>
+      </section>
+      <section className="panel cpa-panel arpa-panel">
+        <div className="panel-heading"><div><span className="eyebrow">AUTOMATIC RADAR PLOTTING AID</span><h2>ARPA · Захват и сопровождение</h2></div><span className="unit">{Object.keys(arpaTracks).length} ЗАХВАЧЕНО</span></div>
+        <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>Цель</th><th>Статус</th><th>Оценка курса / скорости</th><th>TCPA</th><th>DCPA</th><th>Действие</th></tr></thead><tbody>
+          {targets.map((target) => {
+            const track = arpaTracks[target.id];
+            const solution = track ? calculateArpaSolution(track, target, ownVessel) : null;
+            const statusLabel = !track ? "Не захвачена" : track.status === "acquiring" ? "Захват" : track.status === "tracking" ? "Сопровождение" : "Потеряна";
+            return <tr key={target.id}>
+              <td>{target.id}</td>
+              <td><span className={"arpa-status " + (track?.status ?? "idle")}>{statusLabel}</span></td>
+              <td>{track?.estimatedCourseDeg !== null && track?.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
+                ? track.estimatedCourseDeg.toFixed(1) + "°T / " + track.estimatedSpeedKn.toFixed(1) + " kn"
+                : "Недостаточно данных"}</td>
+              <td>{solution ? formatMinutes(solution.tcpaMin) : "—"}</td>
+              <td>{solution?.dcpaNm !== null && solution?.dcpaNm !== undefined ? solution.dcpaNm.toFixed(2) + " NM" : "—"}</td>
+              <td>{track ? <button className="secondary arpa-action" onClick={() => releaseTarget(target.id)}>Снять</button> : <button className="primary arpa-action" onClick={() => acquireTarget(target.id)}>Захватить</button>}</td>
+            </tr>;
+          })}
+        </tbody></table></div>
+        <p className="cpa-note">Захват выполняется вручную. После второго измерения через 5 секунд появляется оценка вектора; скорость и курс вычисляются по последовательности координат методом линейной регрессии. Потеря фиксируется при отсутствии измерений более 15 секунд. CPA/TCPA рассчитываются по оценённой скорости цели и текущей скорости собственного судна.</p>
       </section>
       <section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
