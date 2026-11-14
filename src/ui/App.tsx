@@ -83,6 +83,7 @@ export default function App() {
   const [trialDeceleration, setTrialDeceleration] = useState(0.5);
   const [trialHorizonMin, setTrialHorizonMin] = useState(20);
   const [targetInfoMenuOpen, setTargetInfoMenuOpen] = useState(false);
+  const [selectedTargetInfoBlock, setSelectedTargetInfoBlock] = useState<string | null>(null);
   const [selectedRadarTargetId, setSelectedRadarTargetId] = useState<string | null>(null);
   const [targetInfoTab, setTargetInfoTab] = useState<string>("multiple");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
@@ -562,13 +563,22 @@ export default function App() {
             <div className="target-info-controls"><label>Приоритет <select aria-label="Приоритет источника"><option>ARPA</option></select></label><button type="button" className="target-info-association" title="Сопоставление AIS/ARPA появится после добавления потока AIS">Связь AIS/ARPA</button><label className="target-filter-label">Фильтр AIS <select disabled aria-label="Фильтр AIS"><option>ВЫКЛ. · НЕТ ИСТОЧНИКА AIS</option></select></label></div>
             <div className="target-info-titlebar"><span>ИНФОРМАЦИЯ О ЦЕЛЯХ</span><button type="button" className="target-info-menu-trigger" aria-label="Открыть список приборных блоков" aria-expanded={targetInfoMenuOpen} onClick={() => setTargetInfoMenuOpen((open) => !open)}>{targetInfoMenuOpen ? "▲" : "▼"}</button><small>{arpaInfoRows.length} СОПРОВОЖДАЕМЫХ</small></div>
              {targetInfoMenuOpen && <div className="target-info-expanded-blocks">
+{targetInfoMenuOpen && <div className="target-info-expanded-blocks" role="menu" aria-label="Выбор приборного блока">
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "colreg" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("colreg"); setTargetInfoMenuOpen(false); }}>COLREG ASSESSMENT</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "arpa-targets" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("arpa-targets"); setTargetInfoMenuOpen(false); }}>ARPA TARGETS</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "arpa-display" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("arpa-display"); setTargetInfoMenuOpen(false); }}>ARPA DISPLAY</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "autopilot" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("autopilot"); setTargetInfoMenuOpen(false); }}>AUTOPILOT</button>
+            </div>}
+            {selectedTargetInfoBlock === "arpa-display" && (
 <section className="panel console-panel">
             <div className="panel-heading"><div><span className="eyebrow">ARPA DISPLAY</span><h2>Векторы целей</h2></div></div>
             <div className="console-field"><span>Режим</span><div className="console-toggle"><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>TRUE</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>REL</button></div></div>
             <div className="console-field"><label htmlFor="vector-time">Длина вектора</label><strong>{vectorMinutes} MIN</strong></div>
             <input id="vector-time" type="range" min="1" max="30" step="1" value={vectorMinutes} onChange={(event) => setVectorMinutes(Number(event.target.value))}/>
           </section>
-          <section id="panel-arpa-targets" className="panel console-panel arpa-live-panel">
+                    )}
+          {selectedTargetInfoBlock === "arpa-targets" && (
+<section id="panel-arpa-targets" className="panel console-panel arpa-live-panel">
             <div className="panel-heading"><div><span className="eyebrow">ARPA TARGETS</span><h2>Сопровождаемые цели</h2></div><span className="unit">{Object.values(arpaTracks).filter((track) => track.status === "tracking").length} TRACK</span></div>
             {Object.values(arpaTracks).length > 0 ? <div className="arpa-live-list">
               {Object.values(arpaTracks).map((track) => {
@@ -586,7 +596,9 @@ export default function App() {
             </div> : <p className="cpa-note compact-note">Нет захваченных целей. Выберите эхо на PPI и нажмите «Захватить ARPA».</p>}
             <div className="arpa-threshold-line">ALARM: DCPA {alertDcpaNm.toFixed(1)} NM · TCPA {alertTcpaMinutes} MIN</div>
           </section>
-          <section id="panel-colreg-assessment" className="panel console-panel colreg-live-panel">
+                    )}
+          {selectedTargetInfoBlock === "colreg" && (
+<section id="panel-colreg-assessment" className="panel console-panel colreg-live-panel">
             <div className="panel-heading"><div><span className="eyebrow">COLREG ASSESSMENT</span><h2>МППСС-72 · контекстная оценка</h2></div><span className="unit">RULES 1–41</span></div>
             <div className="colreg-context">
               <div className="colreg-context-heading">ПАРАМЕТРЫ СОБСТВЕННОГО СУДНА И ЦЕЛИ</div>
@@ -696,7 +708,9 @@ export default function App() {
             <details className="colreg-rulebook"><summary>Справочник МППСС-72 · все правила 1–41</summary>{COLREG_RULES.map((rule) => <div className="colreg-rulebook-row" key={rule.number}><strong>Правило {rule.number} · {rule.title}</strong><small>{rule.part}{rule.operational ? "" : " · административная часть"}</small><span>{rule.summary}</span></div>)}</details>
             <p className="cpa-note compact-note">Учебная оценка не распознаёт огни/знаки автоматически и не является юридическим заключением или командой к манёвру. Правила 39–41 относятся к проверке выполнения Конвенции государствами, а не к расхождению судов.</p>
           </section>
-          <section id="panel-autopilot" className="panel autopilot-panel">
+                    )}
+          {selectedTargetInfoBlock === "autopilot" && (
+<section id="panel-autopilot" className="panel autopilot-panel">
             <div className="panel-heading"><div><span className="eyebrow">HEADING CONTROL</span><h2>Автопилот</h2></div><span className={autopilot.engaged ? (Math.abs(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180) > autopilot.offCourseAlarmDeg ? "autopilot-badge alarm" : "autopilot-badge active") : "autopilot-badge"}>{autopilot.engaged ? (Math.abs(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180) > autopilot.offCourseAlarmDeg ? "OFF COURSE" : "AUTO") : "STANDBY"}</span></div>
             <div className="autopilot-readouts">
               <div><small>ЗАДАННЫЙ КУРС</small><b>{autopilot.selectedHeadingDeg.toFixed(0)}°T</b></div>
@@ -718,7 +732,7 @@ export default function App() {
             </div>
             <p className="cpa-note compact-note">Автопилот удерживает только заданный курс. Маршрутное управление, адаптивная модель перекладки и отказоустойчивость рулевого привода пока не моделируются.</p>
           </section>
-            </div>}
+                      )}
            <div className="target-info-foot"><span>CPA/TCPA · BCR/BCT</span><span>ПЕЛЕНГ: ИСТИННЫЙ</span><span>ИСТОЧНИК: ИЗМЕРЕНИЯ РЛС</span></div>
           </section>
           <section className="panel">
