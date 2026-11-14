@@ -10,7 +10,7 @@ import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/sh
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 import { assessColregEncounter, evaluateColregManeuver, type Tack } from "../core/colreg";
 import type { ColregVesselKind } from "../core/colregSignals";
-import { getLightVisibilityMinimums, getSoundSignals, LIGHT_DEFINITIONS } from "../core/colregSignals";
+import { getLightVisibilityMinimums, getRestrictedVisibilitySignal, getSoundSignals, LIGHT_DEFINITIONS } from "../core/colregSignals";
 import { COLREG_RULES } from "../core/colregRules";
 
 const STEP_SECONDS = 0.1;
@@ -318,6 +318,8 @@ export default function App() {
         environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, targetNavigatingChannel: colregTargetNavigatingChannel, ownInshoreTrafficZone: colregOwnInshoreZone, targetWindwardOfOwn: colregTargetWindwardOfOwn === "unknown" ? null : colregTargetWindwardOfOwn === "yes", ownOvertakingNotClear: colregOwnOvertakingNotClear, targetOvertakingNotClear: colregTargetOvertakingNotClear, bearingHistoryDeg: selectedColregHistory.slice(-8).map((sample) => (Math.atan2(sample.xNm, sample.yNm) * 180 / Math.PI + 360) % 360), rangeHistoryNm: selectedColregHistory.slice(-8).map((sample) => Math.hypot(sample.xNm, sample.yNm)), riskDcpaNm: alertDcpaNm },
       })
     : null;
+  const ownRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregOwnKind, lengthM: colregOwnLengthM, underway: colregOwnKind !== "anchored" && colregOwnKind !== "aground", makingWay: colregOwnMakingWay, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, engagedInFishing: colregOwnFishing }) : null;
+  const targetRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregTargetKind, lengthM: colregTargetLengthM, underway: colregTargetKind !== "anchored" && colregTargetKind !== "aground", makingWay: colregTargetMakingWay, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, engagedInFishing: colregTargetFishing }) : null;
   const ownLightRanges = colregAssessment ? getLightVisibilityMinimums(colregOwnLengthM) : null;
   const targetLightRanges = colregAssessment ? getLightVisibilityMinimums(colregTargetLengthM) : null;
   const colregManeuver = selectedColregTarget
@@ -553,6 +555,11 @@ export default function App() {
               <details className="colreg-signals"><summary>Огни и знаки цели: {colregAssessment.targetLightGuidance.title}</summary><b>Цель · правило {colregAssessment.targetLightGuidance.rule}</b><small>Правило 22 · длина {colregTargetLengthM} м ({targetLightRanges?.vesselLengthBand}): топовый {targetLightRanges?.mastheadNm} NM, бортовые {targetLightRanges?.sidelightsNm} NM, кормовой {targetLightRanges?.sternNm} NM, буксировочный {targetLightRanges?.towingNm} NM, круговой {targetLightRanges?.allRoundNm} NM.</small><ul>{colregAssessment.targetLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>{colregAssessment.targetLightGuidance.dayShapes.length > 0 && <><b>Дневные знаки</b><ul>{colregAssessment.targetLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul></>}{colregAssessment.targetLightGuidance.notes.length > 0 && <><b>Примечания</b><ul>{colregAssessment.targetLightGuidance.notes.map((item) => <li key={item}>{item}</li>)}</ul>}</details>
               <details className="colreg-limitations"><summary>Ограничения автоматической оценки</summary><ul>{colregAssessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
             </> : <p className="cpa-note compact-note">Выберите отметку на PPI, захватите её в ARPA и дождитесь статуса TRACK. После этого оценка использует измеренное положение и оценённые ARPA курс/скорость. Контекст судов и навигации можно задать выше.</p>}
+            {colregVisibility === "restricted" && <div className="colreg-applicable-rules">
+              <b>Рекомендуемый сигнал при ограниченной видимости · правило 35</b>
+              {ownRestrictedSignal && <div><strong>Собственное судно · {ownRestrictedSignal.pattern}</strong><span>{ownRestrictedSignal.meaning} · {ownRestrictedSignal.context}</span></div>}
+              {targetRestrictedSignal && <div><strong>Цель · {targetRestrictedSignal.pattern}</strong><span>{targetRestrictedSignal.meaning} · {targetRestrictedSignal.context}</span></div>}
+            </div>}
             <details className="colreg-signals"><summary>Справочник звуковых сигналов · правила 32–37</summary>{getSoundSignals().map((signal, index) => <div className="colreg-signal-row" key={signal.rule + "-" + index}><b>П{signal.rule} · {signal.pattern}</b><span>{signal.meaning}</span><small>{signal.context}</small></div>)}</details>
             <details className="colreg-signals"><summary>Определения огней · правило 21</summary>{LIGHT_DEFINITIONS.map((light) => <div className="colreg-signal-row" key={light.name}><b>{light.name}</b><span>{light.description}</span></div>)}</details>
             <details className="colreg-rulebook"><summary>Справочник МППСС-72 · все правила 1–41</summary>{COLREG_RULES.map((rule) => <div className="colreg-rulebook-row" key={rule.number}><strong>Правило {rule.number} · {rule.title}</strong><small>{rule.part}{rule.operational ? "" : " · административная часть"}</small><span>{rule.summary}</span></div>)}</details>
