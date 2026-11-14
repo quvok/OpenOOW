@@ -503,3 +503,18 @@ input[type=range]{accent-color:#a6b58b}
 
 .target-info-multiple-table{min-width:0;table-layout:fixed}.target-info-multiple-table th:first-child{width:66px}.target-info-multiple-table thead th button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0}.target-info-multiple-table thead th button.selected{color:#ffdc83}.target-info-multiple-table tbody th{text-align:left;color:#e0e8eb;background:#29373e}.target-info-multiple-table td.selected{background:#3d5058;color:#ffe08a}
 @media(max-width:1100px){.target-info-multiple-table{min-width:0}.target-info-multiple-table th,.target-info-multiple-table td{padding:7px 3px;font-size:8px}}
+
+.target-info-titlebar{position:relative}
+.target-info-menu-trigger{margin-left:auto;margin-right:8px;border:1px solid #8a9aa2;border-radius:3px;background:linear-gradient(#8297a1,#31434d);color:#fff;padding:2px 9px;font:700 12px 'DM Mono',monospace;cursor:pointer}
+.target-info-menu{position:relative;z-index:12;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;padding:6px;background:#111c22;border:1px solid #657780;border-top:0;box-shadow:0 8px 18px #0009}
+.target-info-menu button{padding:8px 9px;text-align:left;background:linear-gradient(#455760,#202d34);border:1px solid #52636c;color:#e3eaed;font:10px 'DM Mono',monospace;cursor:pointer}
+.target-info-menu button:hover,.target-info-menu button.active{background:linear-gradient(#9aabb1,#53656d);color:#101a20}
+.target-info-menu button:disabled{opacity:.38;cursor:not-allowed}
+.target-info-detail{padding:10px 4px;color:#dce5e8}
+.target-info-detail h3{margin:3px 0 10px;color:#f1d28c;font:600 11px 'DM Mono',monospace;letter-spacing:.5px}
+.target-info-track-row{display:flex;width:100%;justify-content:space-between;padding:8px;border:1px solid #485960;background:#152128;color:#e5ebed;font:10px 'DM Mono',monospace;cursor:pointer}
+.target-info-track-row span{color:#a9c9a4}
+.trial-controls-compact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:8px;margin:0 0 8px}
+.trial-controls-compact label{display:flex;flex-direction:column;gap:4px}
+.trial-controls-compact input{width:100%;max-width:none}
+@media(max-width:700px){.target-info-menu{grid-template-columns:1fr 1fr}.trial-controls-compact{grid-template-columns:1fr 1fr}}
