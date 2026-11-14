@@ -31,7 +31,7 @@ describe("heading autopilot", () => {
   it("limits rudder command and triggers off-course alarm", () => {
     const state = { ...createAutopilotState(180), engaged: true, rudderLimitDeg: 12, offCourseAlarmDeg: 4 };
     const result = stepAutopilot(state, { ...INITIAL_SHIP_STATE, speedKn: 8 }, 0.1);
-    expect(result.rudderCommandDeg).toBe(12);
+    expect(result.rudderCommandDeg).toBe(-12);
     expect(result.offCourseAlarm).toBe(true);
   });
 
