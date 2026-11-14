@@ -63,6 +63,15 @@ describe("ECDIS navigation calculations", () => {
     expect(result.safe).toBe(false);
   });
 
+  it("accepts a clear route through charted safe water", () => {
+    const result = assessRoute([
+      { id: "a", name: "A", eastNm: 0, northNm: -2 },
+      { id: "b", name: "B", eastNm: 2, northNm: -2 },
+    ], [], [], 10);
+    expect(result.safe).toBe(true);
+    expect(result.warnings).toHaveLength(0);
+  });
+
   it("detects land intersections", () => {
     const land = [{ id: "l", name: "land", kind: "land" as const, polygon: [
       { eastNm: 1, northNm: -1 }, { eastNm: 2, northNm: -1 }, { eastNm: 2, northNm: 1 }, { eastNm: 1, northNm: 1 },
