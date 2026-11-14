@@ -51,12 +51,7 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [safetyContourM, setSafetyContourM] = useState(10);
   const [shallowContourM, setShallowContourM] = useState(20);
   const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);
-  const [activeLegIndex, setActiveLegIndex] = useState(0);
-  const [arrivalRadiusNm, setArrivalRadiusNm] = useState(0.05);
-  const [safetyDepthM, setSafetyDepthM] = useState(8);
-  const [safetyContourM, setSafetyContourM] = useState(10);
-  const [shallowContourM, setShallowContourM] = useState(20);
-  const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);
+
   const [statusMessage, setStatusMessage] = useState("Нажмите на карту, чтобы добавить первую маршрутную точку.");
   const ownPosition = { eastNm: ship.eastNm, northNm: ship.northNm };
   const requiredDepthM = draftM + ukcM;
