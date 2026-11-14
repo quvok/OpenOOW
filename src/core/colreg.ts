@@ -403,9 +403,29 @@ export function assessColregEncounter(
       status: "applies",
     });
 
-    if (ownProfile.underway && targetProfile.underway &&
-        ownProfile.kind === "sailing" && targetProfile.kind === "sailing" &&
-        !ownProfile.underSailAndPower && !targetProfile.underSailAndPower && hasRisk) {
+    const ownOvertaking = ownProfile.underway && targetProfile.underway &&
+      (environment.ownOvertakingNotClear === true || (isAbaftBeam(targetRelativeBearing) && closing > 0.05));
+    const targetOvertaking = ownProfile.underway && targetProfile.underway &&
+      (environment.targetOvertakingNotClear === true || (isAbaftBeam(ownRelativeBearing) && closing > 0.05));
+
+    // Rule 13 takes precedence over the other encounter rules in Section II.
+    if (ownOvertaking && targetOvertaking) {
+      ownShipDuty = "Оба признака обгона отмечены одновременно. Проверьте идентификацию целей и историю сближения; не назначайте обязанность автоматически.";
+    } else if (ownOvertaking) {
+      encounter = "overtaking-own";
+      primaryRule = 13;
+      title = "Собственное судно, вероятно, обгоняет цель";
+      responsibility = "give-way";
+      ownShipDuty = "Правило 13: собственное судно как обгоняющее обязано держаться в стороне от пути обгоняемого до окончательного прохода и чистого расхождения. При сомнении считайте себя обгоняющим.";
+    } else if (targetOvertaking) {
+      encounter = "overtaking-target";
+      primaryRule = 13;
+      title = "Цель, вероятно, обгоняет собственное судно";
+      responsibility = "stand-on";
+      ownShipDuty = "Цель, вероятно, является обгоняющей и обязана держаться в стороне. Сохраняйте курс и скорость, если нет оснований действовать по правилу 17 или другим правилам; не мешайте обгону.";
+    } else if (ownProfile.underway && targetProfile.underway && hasRisk &&
+               ownProfile.kind === "sailing" && targetProfile.kind === "sailing" &&
+               !ownProfile.underSailAndPower && !targetProfile.underSailAndPower) {
       encounter = "sailing-meeting";
       primaryRule = 12;
       title = "Сближение двух парусных судов";
@@ -422,68 +442,49 @@ export function assessColregEncounter(
           ? "На одном галсе наветренное судно должно держаться в стороне от подветренного."
           : "Подветренное судно сохраняет курс и скорость; контролируйте обстановку.";
       } else if (ownProfile.tack === "port" && targetProfile.tack === "unknown" && environment.targetWindwardOfOwn === true) {
-        ownShipDuty = "Вы не можете определить галс другого парусного судна, находясь на левом галсе. По правилу 12(c) держитесь в стороне от него.";
+        ownShipDuty = "Вы не можете определить галс другого парусного судна, находясь на левом галсе, и цель находится наветреннее. По правилу 12(c) держитесь в стороне от неё.";
         responsibility = "give-way";
       } else {
-        ownShipDuty = "Нельзя надёжно определить галс или наветренную сторону. При сомнении примените консервативное действие и уточните положение ветра и парусов.";
+        ownShipDuty = "Нельзя надёжно определить галс или наветренную сторону. При сомнении уточните положение ветра и парусов; не назначайте обязанность автоматически.";
         responsibility = "undetermined";
       }
-      applicableRules.push({ rule: 12, title: "Парусные суда", duty: ownShipDuty, status: "applies" });
+    } else if (ownProfile.underway && targetProfile.underway && hasRisk &&
+               isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
+               Math.abs(180 - courseDifference) <= headOnCourseTolerance &&
+               Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= headOnBearingTolerance &&
+               Math.min(targetRelativeBearing, 360 - targetRelativeBearing) <= headOnBearingTolerance) {
+      encounter = "head-on";
+      primaryRule = 14;
+      title = "Вероятная ситуация встречного сближения";
+      responsibility = "both-act";
+      ownShipDuty = "Правило 14: оба механических судна должны изменить курс вправо, чтобы пройти левыми бортами. Это взаимная обязанность обоих судов, а не обычная пара «уступающее/сохраняющее курс». При сомнении считайте ситуацию встречной.";
+    } else if (ownProfile.underway && targetProfile.underway &&
+               isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
+               hasRisk && ownRelativeBearing > 0 && ownRelativeBearing < 112.5) {
+      encounter = "crossing-starboard";
+      primaryRule = 15;
+      title = "Пересечение: цель справа";
+      responsibility = "give-way";
+      ownShipDuty = "Правило 15: собственное судно видит другое механическое судно справа и должно уступить дорогу. Правило 16 требует заблаговременного и решительного действия; по возможности не пересекайте курс цели перед её носом.";
+    } else if (ownProfile.underway && targetProfile.underway &&
+               isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
+               hasRisk && ownRelativeBearing > 247.5 && ownRelativeBearing < 360) {
+      encounter = "crossing-port";
+      primaryRule = 15;
+      title = "Пересечение: цель слева";
+      responsibility = "stand-on";
+      ownShipDuty = "При подтверждённой ситуации пересечения цель находится слева, поэтому собственное судно обычно сохраняет курс и скорость по правилу 17. Это не освобождает от наблюдения и действий, когда этого требует правило 17.";
     } else {
-      const ownOvertaking = ownProfile.underway && targetProfile.underway && (environment.ownOvertakingNotClear === true || (isAbaftBeam(targetRelativeBearing) && closing > 0.05));
-      const targetOvertaking = ownProfile.underway && targetProfile.underway && (environment.targetOvertakingNotClear === true || (isAbaftBeam(ownRelativeBearing) && closing > 0.05));
-      if (ownOvertaking && targetOvertaking) {
-        ownShipDuty = "Оба признака обгона отмечены одновременно. Проверьте идентификацию целей и историю сближения; не назначайте обязанность автоматически.";
-      } else if (ownOvertaking) {
-        encounter = "overtaking-own";
-        primaryRule = 13;
-        title = "Собственное судно, вероятно, обгоняет цель";
-        responsibility = "give-way";
-        ownShipDuty = "Правило 13: собственное судно как обгоняющее обязано держаться в стороне от пути обгоняемого до окончательного прохода и чистого расхождения. При сомнении считайте себя обгоняющим.";
-      } else if (targetOvertaking) {
-        encounter = "overtaking-target";
-        primaryRule = 13;
-        title = "Цель, вероятно, обгоняет собственное судно";
-        responsibility = "stand-on";
-        ownShipDuty = "Цель, вероятно, является обгоняющей и обязана держаться в стороне. Сохраняйте курс и скорость, если нет оснований действовать по правилу 17 или другим правилам; не мешайте обгону.";
-      } else if (ownProfile.underway && targetProfile.underway && hasRisk &&
-                 isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
-                 Math.abs(180 - courseDifference) <= headOnCourseTolerance &&
-                 Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= headOnBearingTolerance &&
-                 Math.min(targetRelativeBearing, 360 - targetRelativeBearing) <= (options.headOnBearingToleranceDeg ?? 10)) {
-        encounter = "head-on";
-        primaryRule = 14;
-        title = "Вероятная ситуация встречного сближения";
-        responsibility = "both-act";
-        ownShipDuty = "Правило 14: оба механических судна должны изменить курс вправо, чтобы пройти левыми бортами. Это взаимная обязанность обоих судов, а не обычная пара «уступающее/сохраняющее курс». При сомнении считайте ситуацию встречной.";
-      } else if (isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
-                 hasRisk && isForwardSector(ownRelativeBearing) &&
-                 ownRelativeBearing > 0 && ownRelativeBearing < 112.5) {
-        encounter = "crossing-starboard";
-        primaryRule = 15;
-        title = "Пересечение: цель справа";
-        responsibility = "give-way";
-        ownShipDuty = "Правило 15: собственное судно видит другое механическое судно справа и должно уступить дорогу. Правило 16 требует заблаговременного и решительного действия; по возможности не пересекайте курс цели перед её носом.";
-      } else if (ownProfile.kind === "power-driven" && targetProfile.kind === "power-driven" &&
-                 hasRisk && ownRelativeBearing > 247.5 && ownRelativeBearing < 360) {
-        encounter = "crossing-port";
-        primaryRule = 15;
-        title = "Пересечение: цель слева";
-        responsibility = "stand-on";
-        ownShipDuty = "При подтверждённой ситуации пересечения цель находится слева, поэтому собственное судно обычно сохраняет курс и скорость по правилу 17. Это не освобождает от наблюдения и действий, когда этого требует правило 17.";
+      const hierarchy = classifyRule18(ownProfile, targetProfile);
+      const wigFlightSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface);
+      if (hierarchy.responsibility !== "undetermined" && ((ownProfile.underway && targetProfile.underway) || wigFlightSituation)) {
+        encounter = "vessel-priority";
+        primaryRule = 18;
+        title = "Взаимные обязанности по статусу судов";
+        responsibility = hierarchy.responsibility;
+        ownShipDuty = hierarchy.duty;
       } else {
-        const hierarchy = classifyRule18(ownProfile, targetProfile);
-        const wigFlightSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface);
-        if (hierarchy.responsibility !== "undetermined" && ((ownProfile.underway && targetProfile.underway) || wigFlightSituation)) {
-          encounter = "vessel-priority";
-          primaryRule = 18;
-          title = "Взаимные обязанности по статусу судов";
-          responsibility = hierarchy.responsibility;
-          ownShipDuty = hierarchy.duty;
-          applicableRules.push({ rule: 18, title: "Взаимные обязанности судов", duty: ownShipDuty, status: "conditional" });
-        } else {
-          ownShipDuty = "Геометрия не позволяет назначить конкретную обязанность по правилам 12–18. Учитывайте статусы судов, характер операции, местные условия и все доступные средства наблюдения.";
-        }
+        ownShipDuty = "Геометрия не позволяет назначить конкретную обязанность по правилам 12–18. Учитывайте статусы судов, характер операции, местные условия и все доступные средства наблюдения.";
       }
     }
 
