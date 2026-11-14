@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createRadarTrackHistory, recordRadarTracks } from "../src/core/radarTracks";
+import { createRadarTrackHistory, createRadarMeasurementTrackHistory, recordRadarMeasurementTracks, recordRadarTracks } from "../src/core/radarTracks";
+import type { RadarMeasurement } from "../src/core/radarMeasurements";
 import type { VesselState } from "../src/core/navigation";
 
 const target: VesselState = { id: "T1", xNm: 1, yNm: 2, courseDeg: 90, speedKn: 5 };
@@ -50,5 +51,48 @@ describe("radar track history", () => {
     const history = createRadarTrackHistory([target]);
     expect(() => recordRadarTracks(history, [target], 5, 0)).toThrow(RangeError);
     expect(() => recordRadarTracks(history, [target], 5, 5, 1)).toThrow(RangeError);
+  });
+});
+
+describe("measured radar echo history", () => {
+  const echo: RadarMeasurement = {
+    id: "T1", xNm: 1.02, yNm: 2.01, rangeNm: 2.25,
+    bearingDeg: 27, timeSeconds: 2.5, scanNumber: 1,
+  };
+
+  it("starts from measured coordinates relative to own ship", () => {
+    const history = createRadarMeasurementTrackHistory([echo], { xNm: 0.5, yNm: 1 });
+    expect(history.T1).toEqual([{ xNm: 0.52, yNm: 1.01, timeSeconds: 2.5 }]);
+  });
+
+  it("records only echoes present in a radar sweep", () => {
+    const initial = createRadarMeasurementTrackHistory([echo], { xNm: 0, yNm: 0 });
+    const second: RadarMeasurement = { ...echo, xNm: 1.1, timeSeconds: 5, scanNumber: 2 };
+    const next = recordRadarMeasurementTracks(initial, [second], 240, { xNm: 0.1, yNm: 0 });
+    expect(next.T1).toHaveLength(2);
+    expect(next.T1[1]).toEqual({ xNm: 1, yNm: 2.01, timeSeconds: 5 });
+    expect(next).not.toHaveProperty("T2");
+  });
+
+  it("does not fabricate a sample for a missing echo or duplicate scan", () => {
+    const initial = createRadarMeasurementTrackHistory([echo], { xNm: 0, yNm: 0 });
+    expect(recordRadarMeasurementTracks(initial, [], 240)).toBe(initial);
+    expect(recordRadarMeasurementTracks(initial, [echo], 240)).toBe(initial);
+  });
+
+  it("bounds measured history to the newest samples", () => {
+    let history = createRadarMeasurementTrackHistory([echo], { xNm: 0, yNm: 0 });
+    for (let scan = 2; scan <= 7; scan += 1) {
+      history = recordRadarMeasurementTracks(history, [{
+        ...echo, timeSeconds: scan * 2.5, scanNumber: scan, xNm: scan,
+      }], 4);
+    }
+    expect(history.T1).toHaveLength(4);
+    expect(history.T1[0].timeSeconds).toBe(10);
+    expect(history.T1[3].timeSeconds).toBe(17.5);
+  });
+
+  it("rejects invalid history bounds", () => {
+    expect(() => recordRadarMeasurementTracks({}, [echo], 1)).toThrow(RangeError);
   });
 });
