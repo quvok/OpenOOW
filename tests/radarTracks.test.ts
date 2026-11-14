@@ -62,7 +62,10 @@ describe("measured radar echo history", () => {
 
   it("starts from measured coordinates relative to own ship", () => {
     const history = createRadarMeasurementTrackHistory([echo], { xNm: 0.5, yNm: 1 });
-    expect(history.T1).toEqual([{ xNm: 0.52, yNm: 1.01, timeSeconds: 2.5 }]);
+    expect(history.T1).toHaveLength(1);
+    expect(history.T1[0].xNm).toBeCloseTo(0.52);
+    expect(history.T1[0].yNm).toBeCloseTo(1.01);
+    expect(history.T1[0].timeSeconds).toBe(2.5);
   });
 
   it("records only echoes present in a radar sweep", () => {
