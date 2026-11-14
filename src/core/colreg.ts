@@ -189,7 +189,9 @@ function assessRadarTrend(bearings: number[] | undefined, ranges: number[] | und
 function normalizeProfile(profile: Partial<ColregVesselProfile> | undefined): ColregVesselProfile {
   const normalized = { ...defaultProfile, ...profile };
   if (normalized.lengthM !== undefined && (!Number.isFinite(normalized.lengthM) || normalized.lengthM <= 0)) {
-    throw new RangeError("Vessel length must be finite and greater than zero.");\n  }\n  if (normalized.kind === "anchored" || normalized.kind === "aground") {
+    throw new RangeError("Vessel length must be finite and greater than zero.");
+  }
+  if (normalized.kind === "anchored" || normalized.kind === "aground") {
     normalized.underway = false;
     normalized.makingWay = false;
   }
@@ -293,7 +295,9 @@ export function assessColregEncounter(
   const collisionRisk: ColregAssessment["collisionRisk"] = radarTrend.rule7RiskIndication ? "risk" : cpaRisk;
   const hasRisk = collisionRisk === "risk";
 
-  const applicableRules = generalDuties.map((item) => item.rule === 7 && radarTrend.rule7RiskIndication\n    ? { ...item, duty: "Постоянный пеленг при уменьшающейся дистанции по последним радиолокационным измерениям указывает на возможную опасность. Не полагайтесь на один признак: продолжайте систематическую прокладку и оценку всеми доступными средствами." }\n    : item);
+  const applicableRules = generalDuties.map((item) => item.rule === 7 && radarTrend.rule7RiskIndication
+    ? { ...item, duty: "Постоянный пеленг при уменьшающейся дистанции по последним радиолокационным измерениям указывает на возможную опасность. Не полагайтесь на один признак: продолжайте систематическую прокладку и оценку всеми доступными средствами." }
+    : item);
   let encounter: EncounterType = "uncertain";
   let primaryRule: number | null = null;
   let title = "Ситуация не классифицирована";
@@ -334,7 +338,10 @@ export function assessColregEncounter(
         status: "conditional",
       });
     }
-    if (environment.targetFollowingTrafficLane && ((ownProfile.kind === "fishing" && ownProfile.engagedInFishing) || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) || (ownProfile.lengthM ?? 50) < 20)) {\n      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });\n    }\n    if (environment.ownInshoreTrafficZone) {
+    if (environment.targetFollowingTrafficLane && ((ownProfile.kind === "fishing" && ownProfile.engagedInFishing) || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) || (ownProfile.lengthM ?? 50) < 20)) {
+      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });
+    }
+    if (environment.ownInshoreTrafficZone) {
       addDuty(applicableRules, {
         rule: 10,
         title: "Прибрежная зона движения",
@@ -364,7 +371,8 @@ export function assessColregEncounter(
     });
 
     if (ownProfile.underway && targetProfile.underway &&
-        ownProfile.kind === "sailing" && targetProfile.kind === "sailing" &&\n        !ownProfile.underSailAndPower && !targetProfile.underSailAndPower && hasRisk) {
+        ownProfile.kind === "sailing" && targetProfile.kind === "sailing" &&
+        !ownProfile.underSailAndPower && !targetProfile.underSailAndPower && hasRisk) {
       encounter = "sailing-meeting";
       primaryRule = 12;
       title = "Сближение двух парусных судов";
