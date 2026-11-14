@@ -3,7 +3,7 @@ import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
-import { createRadarTrackHistory, recordRadarTracks } from "../core/radarTracks";
+import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
 import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
@@ -51,9 +51,9 @@ export default function App() {
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
-  const [tracks, setTracks] = useState(() => createRadarTrackHistory(ENCOUNTER_SCENARIOS[0].targets));
-  const [arpaTracks, setArpaTracks] = useState<ArpaTrackSet>({});
   const [radarMeasurements, setRadarMeasurements] = useState(() => measureRadarContacts({ xNm: 0, yNm: 0 }, ENCOUNTER_SCENARIOS[0].targets, 0, 0));
+  const [tracks, setTracks] = useState(() => createRadarMeasurementTrackHistory(radarMeasurements, { xNm: 0, yNm: 0 }));
+  const [arpaTracks, setArpaTracks] = useState<ArpaTrackSet>({});
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
@@ -93,6 +93,7 @@ export default function App() {
             const nextTargets = current.targets.map((target) => advanceVessel(target, dtSeconds));
             let nextMeasurements = current.radarMeasurements;
             let nextScan = current.radarScan;
+            let nextTracks = current.tracks;
             let nextArpa = current.arpa;
             if (isRadarScanDue(nextOwnShip.elapsedSeconds, current.radarScan, DEFAULT_RADAR_CONFIG)) {
               const scanNumber = current.radarScan.scanNumber + 1;
@@ -104,15 +105,13 @@ export default function App() {
                 DEFAULT_RADAR_CONFIG,
               );
               nextScan = { lastScanSeconds: nextOwnShip.elapsedSeconds, scanNumber };
+              nextTracks = recordRadarMeasurementTracks(current.tracks, nextMeasurements, 240, { xNm: nextOwnShip.eastNm, yNm: nextOwnShip.northNm });
               nextArpa = updateArpaTracks(current.arpa, nextMeasurements, nextOwnShip.elapsedSeconds, 10);
             }
             return {
               ownShip: nextOwnShip,
               targets: nextTargets,
-              tracks: recordRadarTracks(current.tracks, nextTargets, nextOwnShip.elapsedSeconds, 5, 120, {
-                xNm: nextOwnShip.eastNm,
-                yNm: nextOwnShip.northNm,
-              }),
+              tracks: nextTracks,
               arpa: nextArpa,
               radarMeasurements: nextMeasurements,
               radarScan: nextScan,
@@ -155,14 +154,14 @@ export default function App() {
     const nextTargets = scenario.targets.map((target) => ({ ...target }));
     targetsRef.current = nextTargets;
     setTargets(nextTargets);
-    const nextTracks = createRadarTrackHistory(nextTargets);
+    const initialMeasurements = measureRadarContacts({ xNm: nextShip.eastNm, yNm: nextShip.northNm }, nextTargets, 0, 0, DEFAULT_RADAR_CONFIG);
+    radarMeasurementsRef.current = initialMeasurements;
+    setRadarMeasurements(initialMeasurements);
+    const nextTracks = createRadarMeasurementTrackHistory(initialMeasurements, { xNm: nextShip.eastNm, yNm: nextShip.northNm });
     tracksRef.current = nextTracks;
     setTracks(nextTracks);
     arpaTracksRef.current = {};
     setArpaTracks({});
-    const initialMeasurements = measureRadarContacts({ xNm: nextShip.eastNm, yNm: nextShip.northNm }, nextTargets, 0, 0, DEFAULT_RADAR_CONFIG);
-    radarMeasurementsRef.current = initialMeasurements;
-    setRadarMeasurements(initialMeasurements);
     radarScanClockRef.current = { lastScanSeconds: 0, scanNumber: 0 };
   };
 
@@ -175,14 +174,14 @@ export default function App() {
     const resetTargets = activeScenario.targets.map((target) => ({ ...target }));
     targetsRef.current = resetTargets;
     setTargets(resetTargets);
-    const resetTracks = createRadarTrackHistory(resetTargets);
+    const initialMeasurements = measureRadarContacts({ xNm: resetShip.eastNm, yNm: resetShip.northNm }, resetTargets, 0, 0, DEFAULT_RADAR_CONFIG);
+    radarMeasurementsRef.current = initialMeasurements;
+    setRadarMeasurements(initialMeasurements);
+    const resetTracks = createRadarMeasurementTrackHistory(initialMeasurements, { xNm: resetShip.eastNm, yNm: resetShip.northNm });
     tracksRef.current = resetTracks;
     setTracks(resetTracks);
     arpaTracksRef.current = {};
     setArpaTracks({});
-    const initialMeasurements = measureRadarContacts({ xNm: resetShip.eastNm, yNm: resetShip.northNm }, resetTargets, 0, 0, DEFAULT_RADAR_CONFIG);
-    radarMeasurementsRef.current = initialMeasurements;
-    setRadarMeasurements(initialMeasurements);
     radarScanClockRef.current = { lastScanSeconds: 0, scanNumber: 0 };
   };
 
@@ -256,20 +255,19 @@ export default function App() {
             <circle cx={x} cy={y} r={vrmRadiusPx} className="vrm-ring"/>
             <path d={"M" + x + " " + y + " L" + eblX + " " + eblY} className="ebl-line"/>
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
+            {targets.map((target) => {
+              const history = tracks[target.id] ?? [];
+              const trailPoints = history
+                .map((sample) => projectRelativePosition({ xNm: 0, yNm: 0 }, sample, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER))
+                .filter((sample) => Math.hypot(sample.x - RADAR_CENTER, sample.y - RADAR_CENTER) <= RADAR_RADIUS_PX);
+              const trailPath = trailPoints.map((sample) => sample.x.toFixed(1) + "," + sample.y.toFixed(1)).join(" ");
+              return trailPoints.length > 1 ? <polyline key={target.id} points={trailPath} className="target-trail"/> : null;
+            })}
             {radarMeasurements.map((measurement) => {
               const target = targets.find((item) => item.id === measurement.id);
               if (!target) return null;
               const track = arpaTracks[measurement.id];
               const point = projectRelativePosition(ownVessel, measurement, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
-              const history = tracks[target.id] ?? [];
-              const trailPoints = [...history, {
-                xNm: target.xNm - ownVessel.xNm,
-                yNm: target.yNm - ownVessel.yNm,
-                timeSeconds: ship.elapsedSeconds,
-              }]
-                .map((sample) => projectRelativePosition({ xNm: 0, yNm: 0 }, sample, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER))
-                .filter((sample) => Math.hypot(sample.x - RADAR_CENTER, sample.y - RADAR_CENTER) <= RADAR_RADIUS_PX);
-              const trailPath = trailPoints.map((sample) => sample.x.toFixed(1) + "," + sample.y.toFixed(1)).join(" ");
               const estimatedTarget = track?.estimatedCourseDeg !== null && track?.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
                 ? { courseDeg: track.estimatedCourseDeg, speedKn: track.estimatedSpeedKn }
                 : null;
@@ -288,7 +286,6 @@ export default function App() {
                   " L" + (baseX + unitY * wing) + " " + (baseY - unitX * wing)
                 : "";
               return <g key={target.id}>
-                {trailPoints.length > 1 && <polyline points={trailPath} className="target-trail"/>}
                 <g transform={"translate(" + point.x + " " + point.y + ")"}>
                 {estimatedTarget && <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>}
                 {estimatedTarget && vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
@@ -372,7 +369,7 @@ export default function App() {
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
       </section>
-      <div className="notice"><b>Ограничение учебной модели:</b> радарный обзор, шум и пропуски отметок являются детерминированной упрощённой моделью. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след пока строится по координатам сценария, а не по радиолокационным отметкам. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
+      <div className="notice"><b>Ограничение учебной модели:</b> радарный обзор, шум и пропуски отметок являются детерминированной упрощённой моделью. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след строится только по реально полученным радиолокационным отметкам; при пропуске обзора новая точка не добавляется. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
     </section>
   </main>;
 }
