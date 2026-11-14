@@ -22,14 +22,14 @@ describe("ARPA acquisition and tracking", () => {
   });
 
   it("smooths a sequence of measurements with a least-squares estimate", () => {
-    let tracks = { T1: acquireArpaTarget({ ...target, yNm: 10 }, 0) };
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget({ ...target, yNm: 10 }, 0) };
     tracks = updateArpaTracks(tracks, [{ ...target, yNm: 10 - 5 / 3600 * 5 + 0.0001 }], 5);
     tracks = updateArpaTracks(tracks, [{ ...target, yNm: 10 - 5 / 3600 * 10 - 0.0001 }], 10);
     expect(tracks.T1.estimatedSpeedKn).toBeCloseTo(5, 1);
   });
 
   it("calculates CPA/TCPA from estimated velocity and own-ship velocity", () => {
-    let tracks = { T1: acquireArpaTarget(target, 0) };
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [{ ...target, yNm: 2 - 5 / 3600 * 5 }], 5);
     const solution = calculateArpaSolution(tracks.T1, { xNm: 0, yNm: 2 - 5 / 3600 * 5 }, { ...own, yNm: 10 * 5 / 3600 });
     expect(solution.tcpaMin).toBeCloseTo(8 - 5 / 60);
@@ -37,7 +37,7 @@ describe("ARPA acquisition and tracking", () => {
   });
 
   it("marks a contact lost after the timeout when measurements disappear", () => {
-    let tracks = { T1: acquireArpaTarget(target, 0) };
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
     tracks = updateArpaTracks(tracks, [], 16);
     expect(tracks.T1.status).toBe("lost");
   });
