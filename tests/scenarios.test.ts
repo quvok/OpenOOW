@@ -10,7 +10,7 @@ describe("encounter scenarios", () => {
       "restricted-visibility",
       "multiple-targets"
     ]));
-    expect(ENCOUNTER_SCENARIOS.length).toBeGreaterThan(5);
+    expect(ENCOUNTER_SCENARIOS.length).toBeGreaterThanOrEqual(15);
   });
 
   it("defines a positive collision-risk TCPA for the head-on exercise", () => {
@@ -55,6 +55,11 @@ describe("COLREG scenario presets", () => {
       "sailing-rule12",
       "fishing-rule18",
       "nuc-rule18",
+      "crossing-stand-on",
+      "sailing-windward-rule12",
+      "ram-rule18",
+      "cbd-rule18",
+      "wig-rule18",
       "restricted-visibility",
     ]));
   });
