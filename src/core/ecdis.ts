@@ -249,3 +249,98 @@ export const TRAINING_CHART_HAZARDS: ChartHazard[] = [
   { id: "wreck-east", name: "Затонувший объект E-2", position: { eastNm: 5.4, northNm: 1.2 }, radiusNm: 0.35 },
   { id: "rock-south", name: "Камень S-3", position: { eastNm: -4.8, northNm: -4.0 }, radiusNm: 0.22 },
 ];
+
+
+export interface ActiveLegNavigation {
+  activeLegIndex: number;
+  from: RouteWaypoint;
+  to: RouteWaypoint;
+  distanceToWaypointNm: number;
+  bearingToWaypointDeg: number;
+  crossTrackNm: number;
+  alongTrackNm: number;
+  legLengthNm: number;
+  remainingRouteNm: number;
+  passedWaypoint: boolean;
+}
+
+export function calculateActiveLegNavigation(
+  route: RouteWaypoint[],
+  position: LocalPosition,
+  activeLegIndex: number,
+): ActiveLegNavigation | null {
+  const legs = buildRouteLegs(route);
+  if (!legs.length) return null;
+  const index = Math.max(0, Math.min(legs.length - 1, Math.floor(activeLegIndex)));
+  const leg = legs[index];
+  const dx = leg.to.eastNm - leg.from.eastNm;
+  const dy = leg.to.northNm - leg.from.northNm;
+  const lengthSquared = dx * dx + dy * dy;
+  const length = Math.sqrt(lengthSquared);
+  if (length < 1e-9) return null;
+  const alongTrackNm = ((position.eastNm - leg.from.eastNm) * dx +
+    (position.northNm - leg.from.northNm) * dy) / length;
+  const cross = dx * (position.northNm - leg.from.northNm) -
+    dy * (position.eastNm - leg.from.eastNm);
+  const crossTrackNm = -cross / length;
+  const passedWaypoint = alongTrackNm >= length;
+  const distanceToWaypointNm = distanceNm(position, leg.to);
+  const remainingRouteNm = distanceToWaypointNm +
+    legs.slice(index + 1).reduce((sum, next) => sum + next.distanceNm, 0);
+  return {
+    activeLegIndex: index,
+    from: leg.from,
+    to: leg.to,
+    distanceToWaypointNm,
+    bearingToWaypointDeg: bearingDeg(position, leg.to),
+    crossTrackNm,
+    alongTrackNm,
+    legLengthNm: length,
+    remainingRouteNm,
+    passedWaypoint,
+  };
+}
+
+export function resolveActiveLegIndex(
+  route: RouteWaypoint[],
+  position: LocalPosition,
+  currentIndex: number,
+  arrivalRadiusNm = 0.05,
+): number {
+  const legs = buildRouteLegs(route);
+  if (!legs.length) return 0;
+  let index = Math.max(0, Math.min(legs.length - 1, Math.floor(currentIndex)));
+  while (index < legs.length - 1) {
+    const navigation = calculateActiveLegNavigation(route, position, index);
+    if (!navigation) break;
+    if (navigation.distanceToWaypointNm <= arrivalRadiusNm || navigation.passedWaypoint) index += 1;
+    else break;
+  }
+  return index;
+}
+
+export function calculateWheelOverDistanceNm(speedKn: number, rotDegPerMin: number, courseChangeDeg: number): number | null {
+  if (!Number.isFinite(speedKn) || !Number.isFinite(rotDegPerMin) ||
+      !Number.isFinite(courseChangeDeg) || speedKn <= 0 || rotDegPerMin <= 0) return null;
+  const boundedChange = Math.min(179, Math.abs(courseChangeDeg));
+  if (boundedChange < 0.1) return 0;
+  const turnRadiusNm = speedKn * 0.9549296586 / rotDegPerMin;
+  return turnRadiusNm * Math.tan(boundedChange * Math.PI / 360);
+}
+
+export interface EcdisSafetySettings {
+  safetyDepthM: number;
+  safetyContourM: number;
+  shallowContourM: number;
+}
+
+export function classifyDepth(
+  depthM: number | null,
+  settings: EcdisSafetySettings,
+): "unknown" | "unsafe" | "safety" | "shallow" | "deep" {
+  if (depthM === null || !Number.isFinite(depthM)) return "unknown";
+  if (depthM < settings.safetyDepthM) return "unsafe";
+  if (depthM < settings.safetyContourM) return "safety";
+  if (depthM < settings.shallowContourM) return "shallow";
+  return "deep";
+}
