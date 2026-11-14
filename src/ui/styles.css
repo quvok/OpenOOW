@@ -18,3 +18,7 @@
 
 /* True/relative vector mode selector */
 .vector-mode-control{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0 4px;color:#71909f;font:9px 'DM Mono',monospace;letter-spacing:.7px}.vector-mode-control>div{display:flex;gap:6px}.vector-mode-control button{min-width:0;padding:7px 10px;font-size:10px}.mode-button{border:1px solid #315064;background:#0b1c29;color:#9db4bf}.mode-active{border:1px solid #67c9c6;background:#17636a;color:#eaffff}@media(max-width:600px){.vector-mode-control{align-items:flex-start;flex-direction:column}.vector-mode-control>div{width:100%}.vector-mode-control button{flex:1}}
+
+
+/* Historical radar target trails */
+.target-trail{fill:none;stroke:#d99b5c;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2 3;opacity:.58;pointer-events:none}
