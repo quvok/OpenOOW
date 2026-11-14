@@ -197,7 +197,8 @@ export default function App() {
 
   const acquireTarget = (targetId: string) => {
     const measurement = radarMeasurementsRef.current.find((item) => item.id === targetId);
-    if (!measurement) return;
+    const alreadyTracked = Object.values(arpaTracksRef.current).some((track) => track.associatedRadarId === targetId);
+    if (!measurement || alreadyTracked) return;
     const next = { ...arpaTracksRef.current, [targetId]: acquireArpaTarget(measurement, measurement.timeSeconds) };
     arpaTracksRef.current = next;
     setArpaTracks(next);
@@ -220,7 +221,7 @@ export default function App() {
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
   const selectedMeasurement = radarMeasurements.find((item) => item.id === selectedRadarTargetId) ?? null;
-  const selectedTrack = selectedRadarTargetId ? arpaTracks[selectedRadarTargetId] : undefined;
+  const selectedTrack = selectedRadarTargetId ? Object.values(arpaTracks).find((track) => track.associatedRadarId === selectedRadarTargetId || track.targetId === selectedRadarTargetId) : undefined;
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
   return <main className="app-shell">
@@ -230,7 +231,7 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.13.0</div>
+      <div className="sidebar-foot">SIM CORE · 0.14.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
@@ -370,7 +371,7 @@ export default function App() {
         <div className="cpa-table-wrap"><table className="cpa-table"><thead><tr><th>Цель</th><th>Пеленг</th><th>Дистанция</th><th>TCPA</th><th>DCPA</th></tr></thead><tbody>
           {targetCpa.map(({target,cpa}) => <tr key={target.id}><td>{target.id}</td><td>{cpa ? cpa.bearingDeg.toFixed(1) + "°" : "—"}</td><td>{cpa ? cpa.rangeNm.toFixed(2) + " NM" : "—"}</td><td>{cpa ? formatMinutes(cpa.tcpaMin) : "—"}</td><td>{cpa ? cpa.dcpaNm.toFixed(2) + " NM" : "—"}</td></tr>)}
         </tbody></table></div>
-        <p className="cpa-note">Позиции целей и собственного судна обновляются с фиксированным шагом 0,1 с. CPA/TCPA пересчитываются по текущим векторам при каждом кадре интерфейса. Это расчёт по заданным сценарным векторам. Для оценки по измерениям используйте отдельный блок ARPA ниже.</p>
+        <p className="cpa-note">Позиции целей и собственного судна обновляются с фиксированным шагом 0,1 с. CPA/TCPA пересчитываются по текущим векторам при каждом кадре интерфейса. Это геометрический прогноз по заданным сценарным курсам и скоростям. Векторы на PPI выше строятся отдельно по оценкам ARPA, полученным из радиолокационных обзоров.</p>
       </section>
       <section className="panel cpa-panel arpa-panel">
         <div className="panel-heading"><div><span className="eyebrow">AUTOMATIC RADAR PLOTTING AID</span><h2>ARPA · Захват и сопровождение</h2></div><span className="unit">{Object.keys(arpaTracks).length} ЗАХВАЧЕНО</span></div>
