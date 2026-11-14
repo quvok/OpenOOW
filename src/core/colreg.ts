@@ -478,7 +478,7 @@ export function assessColregEncounter(
       ownShipDuty = "При подтверждённой ситуации пересечения цель находится слева, поэтому собственное судно обычно сохраняет курс и скорость по правилу 17. Это не освобождает от наблюдения и действий, когда этого требует правило 17.";
     } else {
       const hierarchy = classifyRule18(ownProfile, targetProfile);
-      const specialKeepClearSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface) || (ownProfile.kind === "seaplane" && ownProfile.seaplaneOnWater) || (targetProfile.kind === "seaplane" && targetProfile.seaplaneOnWater);
+      const specialKeepClearSituation = (ownProfile.kind === "wig-craft" && !ownProfile.wigOnSurface) || (targetProfile.kind === "wig-craft" && !targetProfile.wigOnSurface);
       if (hierarchy.responsibility !== "undetermined" && ((ownProfile.underway && targetProfile.underway) || specialKeepClearSituation)) {
         encounter = "vessel-priority";
         primaryRule = 18;
