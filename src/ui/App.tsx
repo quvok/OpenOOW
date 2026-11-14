@@ -196,7 +196,7 @@ export default function App() {
 
   const acquireTarget = (targetId: string) => {
     const measurement = radarMeasurementsRef.current.find((item) => item.id === targetId);
-    const alreadyTracked = Object.values(arpaTracksRef.current).some((track) => track.associatedRadarId === targetId);
+    const alreadyTracked = Object.values(arpaTracksRef.current).some((track) => track.associatedRadarId === targetId || track.targetId === targetId);
     if (!measurement || alreadyTracked) return;
     const next = { ...arpaTracksRef.current, [targetId]: acquireArpaTarget(measurement, measurement.timeSeconds) };
     arpaTracksRef.current = next;
@@ -220,7 +220,7 @@ export default function App() {
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
   const selectedMeasurement = radarMeasurements.find((item) => item.id === selectedRadarTargetId) ?? null;
-  const selectedTrack = selectedRadarTargetId ? Object.values(arpaTracks).find((track) => track.associatedRadarId === selectedRadarTargetId || track.targetId === selectedRadarTargetId) : undefined;
+  const selectedTrack = selectedRadarTargetId ? Object.values(arpaTracks).find((track) => track.associatedRadarId === selectedRadarTargetId) ?? arpaTracks[selectedRadarTargetId] : undefined;
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
   return <main className="app-shell">
