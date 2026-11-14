@@ -518,3 +518,16 @@ input[type=range]{accent-color:#a6b58b}
 .trial-controls-compact label{display:flex;flex-direction:column;gap:4px}
 .trial-controls-compact input{width:100%;max-width:none}
 @media(max-width:700px){.target-info-menu{grid-template-columns:1fr 1fr}.trial-controls-compact{grid-template-columns:1fr 1fr}}
+
+/* v0.23.1 — all target data blocks live inside the Targets Information expander */
+.target-info-unified{display:flex;flex-direction:column;gap:0;border:1px solid #596970;border-top:0;background:#172229}
+.target-info-section{min-width:0;padding:10px;border-bottom:1px solid #52616a}
+.target-info-section>h3{margin:0 0 9px;padding:0 0 7px;border-bottom:1px solid #45565e;color:#e9d39c;font:600 10px 'DM Mono',monospace;letter-spacing:.55px}
+.target-info-section>p{margin:6px 0;color:#a9b8bd;font:9px/1.5 'DM Mono',monospace}
+.target-info-section .target-info-metrics{margin-top:7px}
+.target-info-section .target-info-tabs{padding-top:0;margin-bottom:7px}
+.target-info-track-row.selected{border-color:#c5b27c;background:#34444a}
+.target-info-unavailable{background:#111b20}
+.target-info-unavailable p{color:#a7b7bb}
+.target-info-menu{display:none!important}
+@media(max-width:700px){.target-info-section{padding:8px}.target-info-section>h3{font-size:9px}.target-info-section .target-info-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
