@@ -94,6 +94,7 @@ export default function App() {
                 xNm: nextOwnShip.eastNm,
                 yNm: nextOwnShip.northNm,
               }),
+              arpa: updateArpaTracks(current.arpa, nextTargets, nextOwnShip.elapsedSeconds),
             };
           },
         );
@@ -101,11 +102,13 @@ export default function App() {
         shipRef.current = result.state.ownShip;
         targetsRef.current = result.state.targets;
         tracksRef.current = result.state.tracks;
+        arpaTracksRef.current = result.state.arpa;
         accumulatorRef.current = result.accumulatorSeconds;
         if (result.stepsExecuted > 0) {
           setShip(result.state.ownShip);
           setTargets(result.state.targets);
           setTracks(result.state.tracks);
+          setArpaTracks(result.state.arpa);
         }
       }
 
@@ -131,6 +134,8 @@ export default function App() {
     const nextTracks = createRadarTrackHistory(nextTargets);
     tracksRef.current = nextTracks;
     setTracks(nextTracks);
+    arpaTracksRef.current = {};
+    setArpaTracks({});
   };
 
   const reset = () => {
@@ -145,6 +150,8 @@ export default function App() {
     const resetTracks = createRadarTrackHistory(resetTargets);
     tracksRef.current = resetTracks;
     setTracks(resetTracks);
+    arpaTracksRef.current = {};
+    setArpaTracks({});
   };
 
   const acquireTarget = (targetId: string) => {
