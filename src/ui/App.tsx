@@ -7,6 +7,7 @@ import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from
 import { acquireArpaTarget, calculateArpaSolution, calculateTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
+import { createAutopilotState, stepAutopilot, type AutopilotState } from "../core/autopilot";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 import { assessColregEncounter, evaluateColregManeuver, type Tack } from "../core/colreg";
 import type { ColregVesselKind } from "../core/colregSignals";
@@ -69,6 +70,7 @@ export default function App() {
   const [ship, setShip] = useState<ShipDynamicsState>(() => createScenarioShipState(ENCOUNTER_SCENARIOS[0]));
   const [running, setRunning] = useState(false);
   const [activeTab, setActiveTab] = useState<"radar" | "ecdis">("radar");
+  const [autopilot, setAutopilot] = useState<AutopilotState>(() => createAutopilotState());
   const [eblBearingDeg, setEblBearingDeg] = useState(0);
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
@@ -114,12 +116,19 @@ export default function App() {
   const [colregOwnOvertakingNotClear, setColregOwnOvertakingNotClear] = useState(false);
   const [colregTargetOvertakingNotClear, setColregTargetOvertakingNotClear] = useState(false);
   const shipRef = useRef<ShipDynamicsState>(ship);
+  const autopilotRef = useRef<AutopilotState>(autopilot);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
   const arpaTracksRef = useRef<ArpaTrackSet>({});
   const radarMeasurementsRef = useRef(radarMeasurements);
   const radarScanClockRef = useRef<RadarScanClock>({ lastScanSeconds: 0, scanNumber: 0 });
   const accumulatorRef = useRef(0);
+
+  const updateAutopilot = (update: (current: AutopilotState) => AutopilotState) => {
+    const next = update(autopilotRef.current);
+    autopilotRef.current = next;
+    setAutopilot(next);
+  };
 
   const updateShip = (update: (current: ShipDynamicsState) => ShipDynamicsState) => {
     const next = update(shipRef.current);
@@ -143,12 +152,16 @@ export default function App() {
         // Advance own ship and all traffic in one shared fixed-step clock.
         // This prevents the two sets of vessels from ever accumulating different time.
         const result = advanceFixedSteps(
-          { ownShip: shipRef.current, targets: targetsRef.current, tracks: tracksRef.current, arpa: arpaTracksRef.current, radarMeasurements: radarMeasurementsRef.current, radarScan: radarScanClockRef.current },
+          { ownShip: shipRef.current, autopilot: autopilotRef.current, targets: targetsRef.current, tracks: tracksRef.current, arpa: arpaTracksRef.current, radarMeasurements: radarMeasurementsRef.current, radarScan: radarScanClockRef.current },
           elapsedSeconds,
           accumulatorRef.current,
           STEP_SECONDS,
           (current, dtSeconds) => {
-            const nextOwnShip = stepShip(current.ownShip, dtSeconds);
+            const autopilotStep = stepAutopilot(current.autopilot, current.ownShip, dtSeconds);
+            const shipCommand = autopilotStep.rudderCommandDeg === null
+              ? current.ownShip
+              : { ...current.ownShip, rudderDeg: autopilotStep.rudderCommandDeg };
+            const nextOwnShip = stepShip(shipCommand, dtSeconds);
             const nextTargets = current.targets.map((target) => advanceVessel(target, dtSeconds));
             let nextMeasurements = current.radarMeasurements;
             let nextScan = current.radarScan;
@@ -179,6 +192,7 @@ export default function App() {
         );
 
         shipRef.current = result.state.ownShip;
+        autopilotRef.current = result.state.autopilot;
         targetsRef.current = result.state.targets;
         tracksRef.current = result.state.tracks;
         arpaTracksRef.current = result.state.arpa;
@@ -187,6 +201,7 @@ export default function App() {
         accumulatorRef.current = result.accumulatorSeconds;
         if (result.stepsExecuted > 0) {
           setShip(result.state.ownShip);
+          setAutopilot(result.state.autopilot);
           setTargets(result.state.targets);
           setTracks(result.state.tracks);
           setArpaTracks(result.state.arpa);
@@ -208,6 +223,9 @@ export default function App() {
     setSelectedRadarTargetId(null);
     accumulatorRef.current = 0;
     const nextShip = createScenarioShipState(scenario);
+    const standbyAutopilot = createAutopilotState(nextShip.headingDeg);
+    autopilotRef.current = standbyAutopilot;
+    setAutopilot(standbyAutopilot);
     shipRef.current = nextShip;
     setShip(nextShip);
     setActiveScenario(scenario);
@@ -266,6 +284,9 @@ export default function App() {
     setRunning(false);
     accumulatorRef.current = 0;
     const resetShip = createScenarioShipState(activeScenario);
+    const standbyAutopilot = createAutopilotState(resetShip.headingDeg);
+    autopilotRef.current = standbyAutopilot;
+    setAutopilot(standbyAutopilot);
     setTrialCourseDeg(activeScenario.ownShip.courseDeg);
     setTrialSpeedKn(activeScenario.ownShip.speedKn);
     shipRef.current = resetShip;
@@ -644,6 +665,28 @@ export default function App() {
             <button type="button" className="secondary arpa-action trial-reset" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); }}>ТЕКУЩИЕ ПАРАМЕТРЫ</button>
             <p className="cpa-note compact-note">Гипотетический расчёт. Фактический курс и скорость судна не изменяются.</p>
           </section>
+          <section className="panel autopilot-panel">
+            <div className="panel-heading"><div><span className="eyebrow">HEADING CONTROL</span><h2>Автопилот</h2></div><span className={autopilot.engaged ? (Math.abs(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180) > autopilot.offCourseAlarmDeg ? "autopilot-badge alarm" : "autopilot-badge active") : "autopilot-badge"}>{autopilot.engaged ? (Math.abs(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180) > autopilot.offCourseAlarmDeg ? "OFF COURSE" : "AUTO") : "STANDBY"}</span></div>
+            <div className="autopilot-readouts">
+              <div><small>ЗАДАННЫЙ КУРС</small><b>{autopilot.selectedHeadingDeg.toFixed(0)}°T</b></div>
+              <div><small>ФАКТИЧЕСКИЙ КУРС</small><b>{ship.headingDeg.toFixed(1)}°T</b></div>
+              <div><small>ОТКЛОНЕНИЕ</small><b>{(((autopilot.selectedHeadingDeg - ship.headingDeg + 540) % 360) - 180).toFixed(1)}°</b></div>
+            </div>
+            <div className="console-field autopilot-setpoint"><label htmlFor="autopilot-heading">Уставка курса, °T</label><input id="autopilot-heading" type="number" min="0" max="359" step="1" value={autopilot.selectedHeadingDeg} onChange={(event) => updateAutopilot((current) => ({ ...current, selectedHeadingDeg: ((Number(event.target.value) || 0) % 360 + 360) % 360 }))}/></div>
+            <div className="autopilot-adjust">
+              {[-10,-1,1,10].map((step) => <button type="button" className="secondary autopilot-nudge" key={step} onClick={() => updateAutopilot((current) => ({ ...current, selectedHeadingDeg: (current.selectedHeadingDeg + step + 360) % 360 }))}>{step > 0 ? "+" : ""}{step}°</button>)}
+              <button type="button" className="secondary autopilot-nudge" onClick={() => updateAutopilot((current) => ({ ...current, selectedHeadingDeg: shipRef.current.headingDeg }))}>SYNC</button>
+            </div>
+            <div className="autopilot-settings">
+              <label>Предел руля <b>{autopilot.rudderLimitDeg}°</b><input type="range" min="5" max="35" step="1" value={autopilot.rudderLimitDeg} onChange={(event) => updateAutopilot((current) => ({ ...current, rudderLimitDeg: Number(event.target.value) }))}/></label>
+              <label>Сигнал отклонения <b>{autopilot.offCourseAlarmDeg}°</b><input type="range" min="2" max="20" step="1" value={autopilot.offCourseAlarmDeg} onChange={(event) => updateAutopilot((current) => ({ ...current, offCourseAlarmDeg: Number(event.target.value) }))}/></label>
+            </div>
+            <div className="action-row autopilot-actions">
+              <button type="button" className={autopilot.engaged ? "secondary" : "primary"} onClick={() => updateAutopilot((current) => current.engaged ? { ...current, engaged: false } : { ...current, engaged: true, selectedHeadingDeg: current.selectedHeadingDeg })}>{autopilot.engaged ? "ОТКЛЮЧИТЬ" : "ВКЛЮЧИТЬ AUTO"}</button>
+              <span>{autopilot.engaged ? "Руль управляется автопилотом" : "Ручное управление"}</span>
+            </div>
+            <p className="cpa-note compact-note">Автопилот удерживает только заданный курс. Маршрутное управление, адаптивная модель перекладки и отказоустойчивость рулевого привода пока не моделируются.</p>
+          </section>
           <section className="panel">
             <div className="panel-heading"><div><span className="eyebrow">МОСТИК</span><h2>Органы управления</h2></div></div>
             <div className="control-block">
@@ -653,7 +696,7 @@ export default function App() {
             </div>
             <div className="control-block">
               <div className="control-title"><label htmlFor="rudder">Угол руля</label><strong>{ship.rudderDeg.toFixed(0)}°</strong></div>
-              <input id="rudder" type="range" min="-35" max="35" step="1" value={ship.rudderDeg} onChange={(e)=>updateShip(s=>({...s,rudderDeg:Number(e.target.value)}))}/>
+              <input id="rudder" type="range" min="-35" max="35" step="1" value={ship.rudderDeg} disabled={autopilot.engaged} onChange={(e)=>updateShip(s=>({...s,rudderDeg:Number(e.target.value)}))}/>
               <div className="range-labels"><span>35° ЛЕВО</span><span>35° ПРАВО</span></div><div className="actual-rudder">Фактический угол: {ship.actualRudderDeg.toFixed(1)}°</div>
             </div>
             <div className="action-row">
