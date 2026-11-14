@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  assessRoute, bearingDeg, buildRouteLegs, calculateCrossTrackError,
+  assessRoute, bearingDeg, buildRouteLegs, calculateActiveLegNavigation, calculateCrossTrackError, calculateWheelOverDistanceNm, classifyDepth, resolveActiveLegIndex,
   chartedDepthAt, distanceNm, formatCoordinate, pointInPolygon, toGeographicPosition,
   type RouteWaypoint,
 } from "../src/core/ecdis";
@@ -100,5 +100,34 @@ describe("ECDIS navigation calculations", () => {
   it("formats latitude and longitude with hemispheres", () => {
     expect(formatCoordinate(-43.1, true)).toContain("S");
     expect(formatCoordinate(131.9, false)).toContain("E");
+  });
+});
+
+
+describe("ECDIS active route monitoring", () => {
+  it("calculates XTE and DTW against the selected active leg, not the nearest route leg", () => {
+    const result = calculateActiveLegNavigation(route, { eastNm: 0.5, northNm: 1 }, 0);
+    expect(result?.distanceToWaypointNm).toBeCloseTo(Math.sqrt(1.25));
+    expect(result?.crossTrackNm).toBeCloseTo(0.5);
+    expect(result?.bearingToWaypointDeg).toBeCloseTo(333.4349, 3);
+  });
+
+  it("advances the active leg when the waypoint is reached or passed", () => {
+    expect(resolveActiveLegIndex(route, { eastNm: 0, northNm: 2.01 }, 0)).toBe(1);
+    expect(resolveActiveLegIndex(route, { eastNm: 0, northNm: 1 }, 0)).toBe(0);
+  });
+
+  it("calculates wheel-over distance from speed, ROT and course alteration", () => {
+    expect(calculateWheelOverDistanceNm(12, 20, 90)).toBeCloseTo(0.57296, 4);
+    expect(calculateWheelOverDistanceNm(0, 20, 90)).toBeNull();
+  });
+
+  it("classifies chart depths against configurable safety contours", () => {
+    const settings = { safetyDepthM: 8, safetyContourM: 10, shallowContourM: 20 };
+    expect(classifyDepth(null, settings)).toBe("unknown");
+    expect(classifyDepth(6, settings)).toBe("unsafe");
+    expect(classifyDepth(9, settings)).toBe("safety");
+    expect(classifyDepth(15, settings)).toBe("shallow");
+    expect(classifyDepth(30, settings)).toBe("deep");
   });
 });
