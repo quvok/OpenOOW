@@ -43,6 +43,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 export default function App() {
   const [selectedScenarioId, setSelectedScenarioId] = useState(ENCOUNTER_SCENARIOS[0].id);
+  const [scenarioDialogOpen, setScenarioDialogOpen] = useState(false);
   const [activeScenario, setActiveScenario] = useState<EncounterScenario>(ENCOUNTER_SCENARIOS[0]);
   const [ship, setShip] = useState<ShipDynamicsState>(() => createScenarioShipState(ENCOUNTER_SCENARIOS[0]));
   const [running, setRunning] = useState(false);
@@ -229,7 +230,7 @@ export default function App() {
       <header className="topbar transas-topbar">
         <div className="equipment-brand"><span className="equipment-mark">O</span><div><b>OPENOOW</b><small>RADAR / ARPA SIMULATOR</small></div></div>
         <div className="equipment-title"><strong>RADAR</strong><span>{activeScenario.title}</span></div>
-        <div className={running ? "status live" : "status"}><i/>{running ? "SIM RUNNING" : "SIM PAUSED"}</div>
+        <div className="header-actions"><button type="button" className="header-key" onClick={() => setScenarioDialogOpen(true)}>СЦЕНАРИЙ</button><div className={running ? "status live" : "status"}><i/>{running ? "SIM RUNNING" : "SIM PAUSED"}</div></div>
       </header>
       <div className="instrument-strip">
         <span><small>HDG</small><b>{ship.headingDeg.toFixed(0)}°T</b></span>
@@ -239,29 +240,38 @@ export default function App() {
         <span><small>SCAN</small><b>2.5 s</b></span>
         <span><small>TIME</small><b>{formatTime(ship.elapsedSeconds)}</b></span>
       </div>
-      <section className="panel scenario-picker">
-        <div className="scenario-picker-top">
-          <div><span className="eyebrow">УЧЕБНЫЕ СИТУАЦИИ</span><h2>Выбор сценария</h2></div>
-          <span className="unit">{ENCOUNTER_SCENARIOS.length} СЦЕНАРИЕВ</span>
-        </div>
-        <div className="scenario-select-row">
-          <select aria-label="Выбрать сценарий" value={selectedScenarioId} onChange={(event) => setSelectedScenarioId(event.target.value)}>
-            {ENCOUNTER_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.title}</option>)}
-          </select>
-          <button className="primary" onClick={loadScenario}>Загрузить</button>
-        </div>
-        <div className="scenario-description">
-          <b>{activeScenario.title}</b><span>{activeScenario.category}</span>
-          <p>{activeScenario.description}</p>
-          <p><strong>Задача:</strong> {activeScenario.task}</p>
-          <p><strong>Нормативная основа:</strong> {activeScenario.ruleReference}</p>
-          <div className="scenario-facts"><span>Собственный курс: {activeScenario.ownShip.courseDeg.toFixed(0)}° T</span><span>Скорость: {activeScenario.ownShip.speedKn.toFixed(1)} kn</span><span>Видимость: {activeScenario.visibilityNm.toFixed(1)} NM</span></div>
-        </div>
-      </section>
-      <div className="main-grid">
+      {scenarioDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setScenarioDialogOpen(false); }}>
+        <section className="scenario-dialog" role="dialog" aria-modal="true" aria-labelledby="scenario-dialog-title">
+          <div className="dialog-heading"><div><span className="eyebrow">TRAINING SCENARIOS</span><h2 id="scenario-dialog-title">Выбор учебной ситуации</h2></div><button type="button" className="dialog-close" onClick={() => setScenarioDialogOpen(false)} aria-label="Закрыть">×</button></div>
+          <label className="dialog-label" htmlFor="scenario-select">Сценарий</label>
+          <div className="scenario-select-row">
+            <select id="scenario-select" aria-label="Выбрать сценарий" value={selectedScenarioId} onChange={(event) => setSelectedScenarioId(event.target.value)}>
+              {ENCOUNTER_SCENARIOS.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.title}</option>)}
+            </select>
+            <button className="primary" onClick={() => { loadScenario(); setScenarioDialogOpen(false); }}>Загрузить</button>
+          </div>
+          <div className="scenario-description">
+            <b>{activeScenario.title}</b><span>{activeScenario.category}</span>
+            <p>{activeScenario.description}</p>
+            <p><strong>Задача:</strong> {activeScenario.task}</p>
+            <p><strong>Нормативная основа:</strong> {activeScenario.ruleReference}</p>
+            <div className="scenario-facts"><span>Собственный курс: {activeScenario.ownShip.courseDeg.toFixed(0)}° T</span><span>Скорость: {activeScenario.ownShip.speedKn.toFixed(1)} kn</span><span>Видимость: {activeScenario.visibilityNm.toFixed(1)} NM</span></div>
+          </div>
+        </section>
+      </div>}
+      <div className="main-grid radar-console">
+        <aside className="console-rail" aria-label="Функциональные клавиши">
+          <span className="rail-caption">MENU</span>
+          <button type="button" className="console-key" onClick={() => setScenarioDialogOpen(true)}><b>F1</b><span>СЦЕНАРИЙ</span></button>
+          <button type="button" className="console-key" onClick={() => setRunning(value => !value)}><b>F2</b><span>{running ? "ПАУЗА" : "ПУСК"}</span></button>
+          <button type="button" className="console-key" onClick={reset}><b>F3</b><span>СБРОС</span></button>
+          <div className="rail-readout"><small>RANGE</small><strong>3.0</strong><em>NM</em></div>
+          <div className="rail-readout"><small>ORIENT</small><strong>N-UP</strong></div>
+          <div className="rail-spacer"></div>
+          <span className="rail-caption">OPENOOW</span>
+        </aside>
         <section className="panel radar-panel transas-radar-panel">
-          <div className="panel-heading radar-heading"><div><span className="eyebrow">PPI DISPLAY</span><h2>RELATIVE POSITION INDICATOR</h2></div><span className="unit">NORTH UP · {vectorMode.toUpperCase()} VECTOR · {vectorMinutes} MIN</span></div>
-          <div className="vector-mode-control"><span>ВЕКТОРЫ ARPA</span><div><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>Истинные</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>Относительные</button></div><label className="vector-length-control">Время вектора <strong>{vectorMinutes} мин</strong><input type="range" min="1" max="30" step="1" value={vectorMinutes} onChange={(event) => setVectorMinutes(Number(event.target.value))}/></label></div>
+          <div className="panel-heading radar-heading"><div><span className="eyebrow">RADAR / PPI</span><h2>RELATIVE POSITION INDICATOR</h2></div><span className="unit">NORTH UP · {vectorMode.toUpperCase()} · {vectorMinutes} MIN</span></div>
           <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
             {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
@@ -357,6 +367,12 @@ export default function App() {
           </div>
         </section>
         <div className="control-column">
+          <section className="panel console-panel">
+            <div className="panel-heading"><div><span className="eyebrow">ARPA DISPLAY</span><h2>Векторы целей</h2></div></div>
+            <div className="console-field"><span>Режим</span><div className="console-toggle"><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>TRUE</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>REL</button></div></div>
+            <div className="console-field"><label htmlFor="vector-time">Длина вектора</label><strong>{vectorMinutes} MIN</strong></div>
+            <input id="vector-time" type="range" min="1" max="30" step="1" value={vectorMinutes} onChange={(event) => setVectorMinutes(Number(event.target.value))}/>
+          </section>
           <section className="panel">
             <div className="panel-heading"><div><span className="eyebrow">МОСТИК</span><h2>Органы управления</h2></div></div>
             <div className="control-block">
@@ -393,14 +409,14 @@ export default function App() {
         <span>VECTOR: {vectorMode.toUpperCase()}</span><span>ARPA: {Object.keys(arpaTracks).length} TRACKS</span>
         <span className="footer-spacer"></span><span>TRAINING DISPLAY</span>
       </div>
-      <section className="panel cpa-panel">
+      <details className="data-drawer"><summary>CPA / TCPA · Геометрическая оценка всех целей</summary><section className="panel cpa-panel">
         <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ В РЕАЛЬНОМ ВРЕМЕНИ</span><h2>Геометрическая оценка без захвата</h2></div><Target size={18}/></div>
         <div className="cpa-table-wrap"><table className="cpa-table"><thead><tr><th>Цель</th><th>Пеленг</th><th>Дистанция</th><th>TCPA</th><th>DCPA</th></tr></thead><tbody>
           {targetCpa.map(({target,cpa}) => <tr key={target.id}><td>{target.id}</td><td>{cpa ? cpa.bearingDeg.toFixed(1) + "°" : "—"}</td><td>{cpa ? cpa.rangeNm.toFixed(2) + " NM" : "—"}</td><td>{cpa ? formatMinutes(cpa.tcpaMin) : "—"}</td><td>{cpa ? cpa.dcpaNm.toFixed(2) + " NM" : "—"}</td></tr>)}
         </tbody></table></div>
         <p className="cpa-note">Позиции целей и собственного судна обновляются с фиксированным шагом 0,1 с. CPA/TCPA пересчитываются по текущим векторам при каждом кадре интерфейса. Это геометрический прогноз по заданным сценарным курсам и скоростям. Векторы на PPI выше строятся отдельно по оценкам ARPA, полученным из радиолокационных обзоров.</p>
-      </section>
-      <section className="panel cpa-panel arpa-panel">
+      </section></details>
+      <details className="data-drawer"><summary>ARPA · Сопровождение и Trial Manoeuvre</summary><section className="panel cpa-panel arpa-panel">
         <div className="panel-heading"><div><span className="eyebrow">AUTOMATIC RADAR PLOTTING AID</span><h2>ARPA · Захват и сопровождение</h2></div><span className="unit">{Object.keys(arpaTracks).length} ЗАХВАЧЕНО</span></div>
         <div className="arpa-alert-settings">
           <label>Порог DCPA, NM <input type="number" min="0" max="10" step="0.1" value={alertDcpaNm} onChange={(event) => setAlertDcpaNm(Math.max(0, Math.min(10, Number(event.target.value) || 0)))}/></label>
@@ -438,11 +454,11 @@ export default function App() {
           {Object.keys(arpaTracks).length === 0 && <tr><td colSpan={11}>Выберите радиолокационную отметку на PPI и выполните ручной захват.</td></tr>}
         </tbody></table></div>
         <p className="cpa-note">Захват выполняется вручную по радиолокационной отметке. Сопровождение использует только завершённые обзоры радара. Lost фиксируется после трёх пропущенных обзоров (7,5 с). При повторном обнаружении той же отметки трек захватывается заново без старой истории. Target Swap выявляется по прогнозируемому положению и однозначному сопоставлению отметок с активными треками; это упрощённая детерминированная модель, а не сертифицированный алгоритм. Trial Manoeuvre пересчитывает CPA/TCPA для заданных пробных курса и скорости, не меняя реальное движение судна. Тревога — учебная, не норматив COLREG.</p>
-      </section>
-      <section className="panel debrief-panel">
+      </section></details>
+      <details className="data-drawer"><summary>РАЗБОР УЧЕБНОЙ СИТУАЦИИ</summary><section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
-      </section>
+      </section></details>
       <div className="notice"><b>Ограничение учебной модели:</b> искусственные шумы и пропуски отметок отключены; обзор обновляется каждые 2,5 секунды. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след строится только по реально полученным радиолокационным отметкам; при пропуске обзора новая точка не добавляется. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
     </section>
   </main>;
