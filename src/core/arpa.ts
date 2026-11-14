@@ -6,12 +6,16 @@ export interface ArpaMeasurement {
   xNm: number;
   yNm: number;
   timeSeconds: number;
+  radarId?: string;
 }
 
 export type ArpaTrackStatus = "acquiring" | "tracking" | "lost";
 
 export interface ArpaTrack {
+  /** Stable identity assigned at manual acquisition; does not change on an echo swap. */
   targetId: string;
+  /** Current radar echo associated with this logical ARPA track. */
+  associatedRadarId: string;
   status: ArpaTrackStatus;
   measurements: ArpaMeasurement[];
   lastMeasurementSeconds: number;
@@ -20,14 +24,16 @@ export interface ArpaTrack {
   estimatedCourseDeg: number | null;
   estimatedSpeedKn: number | null;
   measurementsUsed: number;
+  swapDetected: boolean;
+  swapCount: number;
+  lastSwapSeconds: number | null;
 }
 
 export type ArpaTrackSet = Record<string, ArpaTrack>;
 
 const MAX_MEASUREMENTS = 8;
-
-/** Three missed 2.5-second sweeps in the standard radar configuration. */
 export const DEFAULT_ARPA_LOST_AFTER_SECONDS = 7.5;
+export const DEFAULT_ARPA_ASSOCIATION_GATE_NM = 0.25;
 
 export interface ArpaAlertConfig {
   minimumDcpaNm: number;
@@ -38,6 +44,11 @@ export const DEFAULT_ARPA_ALERT_CONFIG: ArpaAlertConfig = {
   minimumDcpaNm: 0.5,
   maximumTcpaMinutes: 15,
 };
+
+export interface TrialManoeuvre {
+  courseDeg: number;
+  speedKn: number;
+}
 
 function validateTime(timeSeconds: number) {
   if (!Number.isFinite(timeSeconds) || timeSeconds < 0) {
@@ -52,23 +63,34 @@ function validateAlertConfig(config: ArpaAlertConfig) {
   }
 }
 
+function validateTrial(trial: TrialManoeuvre) {
+  if (!Number.isFinite(trial.courseDeg) || !Number.isFinite(trial.speedKn) ||
+      trial.courseDeg < 0 || trial.courseDeg >= 360 || trial.speedKn < 0) {
+    throw new RangeError("Trial course must be in [0, 360) degrees and speed must be non-negative.");
+  }
+}
+
 /** Starts manual acquisition from the contact's current measured position. */
 export function acquireArpaTarget(target: Pick<RadarMeasurement, "id" | "xNm" | "yNm">, timeSeconds: number): ArpaTrack {
   validateTime(timeSeconds);
   return {
     targetId: target.id,
+    associatedRadarId: target.id,
     status: "acquiring",
-    measurements: [{ xNm: target.xNm, yNm: target.yNm, timeSeconds }],
+    measurements: [{ xNm: target.xNm, yNm: target.yNm, timeSeconds, radarId: target.id }],
     lastMeasurementSeconds: timeSeconds,
     targetVelocityEastKn: null,
     targetVelocityNorthKn: null,
     estimatedCourseDeg: null,
     estimatedSpeedKn: null,
     measurementsUsed: 1,
+    swapDetected: false,
+    swapCount: 0,
+    lastSwapSeconds: null,
   };
 }
 
-/** Least-squares velocity estimate from absolute position measurements. */
+/** Least-squares velocity estimate from measured absolute positions. */
 function estimateVelocity(samples: readonly ArpaMeasurement[]) {
   if (samples.length < 2) return null;
   const origin = samples[0].timeSeconds;
@@ -85,72 +107,123 @@ function estimateVelocity(samples: readonly ArpaMeasurement[]) {
     numeratorY += dt * (sample.yNm - meanY);
   }
   if (denominator < 1e-12) return null;
+  return { eastKn: numeratorX / denominator * 3600, northKn: numeratorY / denominator * 3600 };
+}
+
+function predictTrackPosition(track: ArpaTrack, timeSeconds: number) {
+  const last = track.measurements[track.measurements.length - 1];
+  const hours = Math.max(0, timeSeconds - last.timeSeconds) / 3600;
   return {
-    eastKn: (numeratorX / denominator) * 3600,
-    northKn: (numeratorY / denominator) * 3600,
+    xNm: last.xNm + (track.targetVelocityEastKn ?? 0) * hours,
+    yNm: last.yNm + (track.targetVelocityNorthKn ?? 0) * hours,
+  };
+}
+
+function restartTrack(track: ArpaTrack, measurement: Pick<RadarMeasurement, "id" | "xNm" | "yNm">, timeSeconds: number): ArpaTrack {
+  return {
+    ...acquireArpaTarget(measurement, timeSeconds),
+    targetId: track.targetId,
+    swapCount: track.swapCount,
+    lastSwapSeconds: track.lastSwapSeconds,
   };
 }
 
 /**
- * Updates tracks only from completed radar-sweep measurements.
- * Lost is declared after the configured number of missed sweeps. If a lost
- * contact reappears under the same sensor ID, its old history is discarded
- * and acquisition restarts from the new measured position.
+ * Associate echoes to existing logical tracks by predicted position. The
+ * one-to-one minimum-distance assignment prevents two tracks consuming one
+ * echo. A changed echo identity is surfaced as a Target Swap event.
+ *
+ * This is a deterministic teaching association model, not a certified ARPA
+ * tracking algorithm. Measurements are consumed only on completed radar scans.
  */
 export function updateArpaTracks(
   tracks: ArpaTrackSet,
   scanMeasurements: readonly Pick<RadarMeasurement, "id" | "xNm" | "yNm">[],
   timeSeconds: number,
   lostAfterSeconds = DEFAULT_ARPA_LOST_AFTER_SECONDS,
+  associationGateNm = DEFAULT_ARPA_ASSOCIATION_GATE_NM,
 ): ArpaTrackSet {
   validateTime(timeSeconds);
-  if (!Number.isFinite(lostAfterSeconds) || lostAfterSeconds <= 0) {
-    throw new RangeError("ARPA lost timeout must be positive.");
+  if (!Number.isFinite(lostAfterSeconds) || lostAfterSeconds <= 0 ||
+      !Number.isFinite(associationGateNm) || associationGateNm <= 0) {
+    throw new RangeError("ARPA lost timeout and association gate must be positive.");
   }
 
-  let nextTracks = tracks;
-  for (const [id, track] of Object.entries(tracks)) {
-    const target = scanMeasurements.find((item) => item.id === id);
-    if (!target) {
-      if (track.status !== "lost" && timeSeconds - track.lastMeasurementSeconds >= lostAfterSeconds - 1e-9) {
-        if (nextTracks === tracks) nextTracks = { ...tracks };
-        nextTracks[id] = { ...track, status: "lost" };
-      }
-      continue;
-    }
+  const next: ArpaTrackSet = { ...tracks };
+  const activeTracks = Object.values(tracks).filter((track) => track.status !== "lost");
+  const pairs: Array<{ track: ArpaTrack; measurement: typeof scanMeasurements[number]; distance: number }> = [];
 
-    if (track.status === "lost") {
-      if (nextTracks === tracks) nextTracks = { ...tracks };
-      nextTracks[id] = acquireArpaTarget({ id, xNm: target.xNm, yNm: target.yNm }, timeSeconds);
+  for (const track of activeTracks) {
+    const predicted = predictTrackPosition(track, timeSeconds);
+    for (const measurement of scanMeasurements) {
+      const distance = Math.hypot(measurement.xNm - predicted.xNm, measurement.yNm - predicted.yNm);
+      if (distance <= associationGateNm) pairs.push({ track, measurement, distance });
+    }
+  }
+  pairs.sort((a, b) => a.distance - b.distance);
+
+  const assignedTracks = new Set<string>();
+  const assignedEchoes = new Set<string>();
+  const assignments = new Map<string, typeof scanMeasurements[number]>();
+  for (const pair of pairs) {
+    if (assignedTracks.has(pair.track.targetId) || assignedEchoes.has(pair.measurement.id)) continue;
+    assignedTracks.add(pair.track.targetId);
+    assignedEchoes.add(pair.measurement.id);
+    assignments.set(pair.track.targetId, pair.measurement);
+  }
+
+  for (const track of activeTracks) {
+    const measurement = assignments.get(track.targetId);
+    if (!measurement) {
+      if (timeSeconds - track.lastMeasurementSeconds >= lostAfterSeconds - 1e-9) {
+        next[track.targetId] = { ...track, status: "lost", swapDetected: false };
+      } else if (track.swapDetected) {
+        next[track.targetId] = { ...track, swapDetected: false };
+      }
       continue;
     }
     if (timeSeconds <= track.lastMeasurementSeconds + 1e-9) continue;
 
-    const nextMeasurements = [...track.measurements, {
-      xNm: target.xNm,
-      yNm: target.yNm,
+    const swapped = measurement.id !== track.associatedRadarId;
+    const samples = [...track.measurements, {
+      xNm: measurement.xNm,
+      yNm: measurement.yNm,
       timeSeconds,
+      radarId: measurement.id,
     }].slice(-MAX_MEASUREMENTS);
-    const velocity = estimateVelocity(nextMeasurements);
+    const velocity = estimateVelocity(samples);
     const speedKn = velocity ? Math.hypot(velocity.eastKn, velocity.northKn) : null;
     const courseDeg = velocity && speedKn !== null && speedKn > 1e-8
       ? (Math.atan2(velocity.eastKn, velocity.northKn) * 180 / Math.PI + 360) % 360
       : velocity ? track.estimatedCourseDeg : null;
 
-    if (nextTracks === tracks) nextTracks = { ...tracks };
-    nextTracks[id] = {
+    next[track.targetId] = {
       ...track,
+      associatedRadarId: measurement.id,
       status: velocity ? "tracking" : "acquiring",
-      measurements: nextMeasurements,
+      measurements: samples,
       lastMeasurementSeconds: timeSeconds,
       targetVelocityEastKn: velocity?.eastKn ?? null,
       targetVelocityNorthKn: velocity?.northKn ?? null,
       estimatedCourseDeg: courseDeg,
       estimatedSpeedKn: speedKn,
-      measurementsUsed: nextMeasurements.length,
+      measurementsUsed: samples.length,
+      swapDetected: swapped,
+      swapCount: track.swapCount + (swapped ? 1 : 0),
+      lastSwapSeconds: swapped ? timeSeconds : track.lastSwapSeconds,
     };
   }
-  return nextTracks;
+
+  // A lost logical track can be reacquired only by its last associated echo ID.
+  for (const track of Object.values(tracks)) {
+    if (track.status !== "lost") continue;
+    const measurement = scanMeasurements.find((item) => item.id === track.associatedRadarId);
+    if (measurement && !assignedEchoes.has(measurement.id)) {
+      next[track.targetId] = restartTrack(track, measurement, timeSeconds);
+      assignedEchoes.add(measurement.id);
+    }
+  }
+  return next;
 }
 
 export interface ArpaSolution {
@@ -160,7 +233,7 @@ export interface ArpaSolution {
   dcpaNm: number | null;
 }
 
-/** CPA/TCPA from the latest contact position, estimated target velocity and own-ship motion. */
+/** CPA/TCPA from measured contact position, estimated target velocity and own-ship motion. */
 export function calculateArpaSolution(
   track: ArpaTrack,
   target: Pick<VesselState, "xNm" | "yNm">,
@@ -181,12 +254,18 @@ export function calculateArpaSolution(
   const timeHours = -(east * relativeEastKn + north * relativeNorthKn) / velocitySquared;
   const cpaEast = east + relativeEastKn * timeHours;
   const cpaNorth = north + relativeNorthKn * timeHours;
-  return {
-    rangeNm,
-    bearingDeg,
-    tcpaMin: timeHours * 60,
-    dcpaNm: Math.hypot(cpaEast, cpaNorth),
-  };
+  return { rangeNm, bearingDeg, tcpaMin: timeHours * 60, dcpaNm: Math.hypot(cpaEast, cpaNorth) };
+}
+
+/** Predicts the same target against a hypothetical own-ship course and speed. */
+export function calculateTrialManoeuvre(
+  track: ArpaTrack,
+  target: Pick<VesselState, "xNm" | "yNm">,
+  own: Pick<VesselState, "xNm" | "yNm">,
+  trial: TrialManoeuvre,
+): ArpaSolution {
+  validateTrial(trial);
+  return calculateArpaSolution(track, target, { ...own, ...trial });
 }
 
 /** Training alert only; thresholds are configurable and are not COLREG limits. */
