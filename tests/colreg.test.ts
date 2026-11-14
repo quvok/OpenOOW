@@ -61,7 +61,7 @@ describe("COLREG context and encounter assessment", () => {
     const result = assessColregEncounter(own(), target(0, 2, 180, 10));
     expect(result.encounter).toBe("head-on");
     expect(result.primaryRule).toBe(14);
-    expect(result.responsibility).toBe("give-way");
+    expect(result.responsibility).toBe("both-act");
   });
 
   it("does not apply Rule 14 to a sailing vessel", () => {
