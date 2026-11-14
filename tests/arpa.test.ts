@@ -5,6 +5,7 @@ import {
   calculateArpaSolution,
   calculateBowCrossing,
   calculateTrialManoeuvre,
+  calculateDynamicTrialManoeuvre,
   updateArpaTracks,
   isArpaCloseApproachAlert,
   DEFAULT_ARPA_ALERT_CONFIG,
@@ -200,5 +201,30 @@ describe("ARPA acquisition and tracking", () => {
   it("does not append a duplicate measurement at the same scan time", () => {
     const tracks = { T1: acquireArpaTarget(target, 0) };
     expect(updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 }], 0)).toEqual(tracks);
+  });
+
+  it("simulates a delayed dynamic trial with finite turn rate and speed change", () => {
+    const track = {
+      ...acquireArpaTarget(target, 0),
+      status: "tracking" as const,
+      targetVelocityEastKn: 0,
+      targetVelocityNorthKn: -5,
+    };
+    const ownBefore = { ...own };
+    const immediate = calculateDynamicTrialManoeuvre(track, target, own, {
+      courseDeg: 90, speedKn: 8, delayMin: 0, turnRateDegPerMin: 3,
+      accelerationKnPerMin: 0.5, decelerationKnPerMin: 0.5, horizonMin: 20,
+    });
+    const delayed = calculateDynamicTrialManoeuvre(track, target, own, {
+      courseDeg: 90, speedKn: 8, delayMin: 5, turnRateDegPerMin: 3,
+      accelerationKnPerMin: 0.5, decelerationKnPerMin: 0.5, horizonMin: 20,
+    });
+    expect(immediate.dcpaNm).not.toBeCloseTo(delayed.dcpaNm ?? 0, 3);
+    expect(immediate.tcpaMin).not.toBe(delayed.tcpaMin);
+    expect(own).toEqual(ownBefore);
+    expect(() => calculateDynamicTrialManoeuvre(track, target, own, {
+      courseDeg: 90, speedKn: 8, delayMin: 0, turnRateDegPerMin: 0,
+      accelerationKnPerMin: 0.5, decelerationKnPerMin: 0.5, horizonMin: 20,
+    })).toThrow(RangeError);
   });
 });
