@@ -10,7 +10,7 @@ import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/sh
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 import { assessColregEncounter, evaluateColregManeuver, type Tack } from "../core/colreg";
 import type { ColregVesselKind } from "../core/colregSignals";
-import { getLightVisibilityMinimums, getSoundSignals } from "../core/colregSignals";
+import { getLightVisibilityMinimums, getSoundSignals, LIGHT_DEFINITIONS } from "../core/colregSignals";
 import { COLREG_RULES } from "../core/colregRules";
 
 const STEP_SECONDS = 0.1;
@@ -548,6 +548,7 @@ export default function App() {
               <details className="colreg-limitations"><summary>Ограничения автоматической оценки</summary><ul>{colregAssessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
             </> : <p className="cpa-note compact-note">Выберите отметку на PPI, захватите её в ARPA и дождитесь статуса TRACK. После этого оценка использует измеренное положение и оценённые ARPA курс/скорость. Контекст судов и навигации можно задать выше.</p>}
             <details className="colreg-signals"><summary>Справочник звуковых сигналов · правила 32–37</summary>{getSoundSignals().map((signal, index) => <div className="colreg-signal-row" key={signal.rule + "-" + index}><b>П{signal.rule} · {signal.pattern}</b><span>{signal.meaning}</span><small>{signal.context}</small></div>)}</details>
+            <details className="colreg-signals"><summary>Определения огней · правило 21</summary>{LIGHT_DEFINITIONS.map((light) => <div className="colreg-signal-row" key={light.name}><b>{light.name}</b><span>{light.description}</span></div>)}</details>
             <details className="colreg-rulebook"><summary>Справочник МППСС-72 · все правила 1–41</summary>{COLREG_RULES.map((rule) => <div className="colreg-rulebook-row" key={rule.number}><strong>Правило {rule.number} · {rule.title}</strong><small>{rule.part}{rule.operational ? "" : " · административная часть"}</small><span>{rule.summary}</span></div>)}</details>
             <p className="cpa-note compact-note">Учебная оценка не распознаёт огни/знаки автоматически и не является юридическим заключением или командой к манёвру. Правила 39–41 относятся к проверке выполнения Конвенции государствами, а не к расхождению судов.</p>
           </section>
