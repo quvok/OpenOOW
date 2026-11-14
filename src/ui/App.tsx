@@ -529,9 +529,15 @@ export default function App() {
               <div className="colreg-rule-line"><strong>{colregAssessment.primaryRule ? "ПРАВИЛО " + colregAssessment.primaryRule : "ПРАВИЛО НЕ ОПРЕДЕЛЕНО"}</strong><span>{colregAssessment.responsibility === "give-way" ? "GIVE-WAY" : colregAssessment.responsibility === "stand-on" ? "STAND-ON" : colregAssessment.responsibility === "both-act" ? "BOTH ALTER STARBOARD" : colregAssessment.responsibility === "no-specific-duty" ? "NO AUTOMATIC PRIORITY" : "CHECK CONTEXT"} · {colregAssessment.collisionRisk === "risk" ? "CPA RISK" : colregAssessment.collisionRisk === "no-immediate-risk" ? "NO IMMEDIATE RISK" : "CPA N/A"}</span></div>
               <h3 className="colreg-title">{colregAssessment.title}</h3>
               <p className="colreg-duty">{colregAssessment.ownShipDuty}</p>
+              <div className={colregAssessment.rule7RiskIndication ? "colreg-rule7-line active" : "colreg-rule7-line"}>
+                <strong>RULE 7 · RADAR PLOT</strong>
+                <span>{colregAssessment.rule7RiskIndication ? "Возможная опасность: пеленг практически постоянен, дистанция уменьшается" : "Пеленг: " + (colregAssessment.bearingTrend === "insufficient" ? "недостаточно данных" : colregAssessment.bearingTrend === "stable" ? "стабильный" : "изменяется") + " · дистанция: " + (colregAssessment.rangeTrend === "insufficient" ? "недостаточно данных" : colregAssessment.rangeTrend === "decreasing" ? "уменьшается" : colregAssessment.rangeTrend === "increasing" ? "увеличивается" : "без изменения")}</span>
+              </div>
               <div className="colreg-readouts">
                 <div><small>ПЕЛЕНГ ЦЕЛИ</small><b>{colregAssessment.targetRelativeBearingDeg.toFixed(1)}° от носа</b></div>
                 <div><small>КУРСОВАЯ РАЗНИЦА</small><b>{colregAssessment.courseDifferenceDeg.toFixed(1)}°</b></div>
+                <div><small>ДИСТАНЦИЯ</small><b>{colregAssessment.rangeNm.toFixed(2)} NM</b></div>
+                <div><small>СКОРОСТЬ СБЛИЖЕНИЯ</small><b>{colregAssessment.closingSpeedKn.toFixed(1)} kn</b></div>
                 <div><small>DCPA</small><b>{colregAssessment.dcpaNm === null ? "—" : colregAssessment.dcpaNm.toFixed(2) + " NM"}</b></div>
                 <div><small>TCPA</small><b>{colregAssessment.tcpaMin === null ? "—" : formatMinutes(colregAssessment.tcpaMin)}</b></div>
               </div>
