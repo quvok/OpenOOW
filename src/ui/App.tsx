@@ -61,7 +61,7 @@ export default function App() {
             <div className="control-block">
               <div className="control-title"><label htmlFor="rudder">Угол руля</label><strong>{ship.rudderDeg.toFixed(0)}°</strong></div>
               <input id="rudder" type="range" min="-35" max="35" step="1" value={ship.rudderDeg} onChange={(e)=>setShip(s=>({...s,rudderDeg:Number(e.target.value)}))}/>
-              <div className="range-labels"><span>35° ЛЕВО</span><span>35° ПРАВО</span></div>
+              <div className="range-labels"><span>35° ЛЕВО</span><span>35° ПРАВО</span></div><div className="actual-rudder">Фактический угол: {ship.actualRudderDeg.toFixed(1)}°</div>
             </div>
             <div className="action-row">
               <button className="primary" onClick={()=>setRunning(v=>!v)}>{running ? "Пауза" : "Пуск"}</button>
@@ -81,7 +81,7 @@ export default function App() {
           </section>
         </div>
       </div>
-      <div className="notice"><b>О модели:</b> версия 0.2 использует упрощённую кинематическую модель с инерцией разгона и запаздыванием реакции рыскания на руль. Это не полноценная гидродинамика и не навигационный прибор.</div>
+      <div className="notice"><b>О модели:</b> версия 0.2 использует упрощённую кинематическую модель с инерцией разгона и запаздыванием реакции рыскания на руль. Рулевой привод имеет ограниченную скорость перекладки, а эффективность руля зависит от скорости. Это не полноценная гидродинамика и не навигационный прибор.</div>
     </section>
   </main>;
 }
