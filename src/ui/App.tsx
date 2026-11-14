@@ -90,6 +90,8 @@ export default function App() {
   const [colregOwnMakingWay, setColregOwnMakingWay] = useState(false);
   const [colregTargetMakingWay, setColregTargetMakingWay] = useState(true);
   const [colregTargetWigOnSurface, setColregTargetWigOnSurface] = useState(false);
+  const [colregOwnSeaplaneOnWater, setColregOwnSeaplaneOnWater] = useState(false);
+  const [colregTargetSeaplaneOnWater, setColregTargetSeaplaneOnWater] = useState(false);
   const [colregOwnLengthM, setColregOwnLengthM] = useState(50);
   const [colregTargetLengthM, setColregTargetLengthM] = useState(50);
   const [colregOwnTack, setColregOwnTack] = useState<Tack>("unknown");
@@ -219,6 +221,8 @@ export default function App() {
     setColregTargetMotorUnderSail(targetContext?.underSailAndPower ?? false);
     setColregOwnWigOnSurface(ownContext?.wigOnSurface ?? false);
     setColregTargetWigOnSurface(targetContext?.wigOnSurface ?? false);
+    setColregOwnSeaplaneOnWater(ownContext?.seaplaneOnWater ?? false);
+    setColregTargetSeaplaneOnWater(targetContext?.seaplaneOnWater ?? false);
     setColregOwnMakingWay(ownContext?.makingWay ?? scenario.ownShip.speedKn > 0);
     setColregTargetMakingWay(targetContext?.makingWay ?? (scenario.targets[0]?.speedKn ?? 0) > 0);
     setColregOwnTack(ownContext?.tack ?? "unknown");
@@ -326,8 +330,8 @@ export default function App() {
     : null;
   const colregAssessment = selectedColregTarget
     ? assessColregEncounter(ownVessel, selectedColregTarget, {
-        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, makingWay: colregOwnMakingWay, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes", lengthM: colregOwnLengthM },
-        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, makingWay: colregTargetMakingWay, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes", lengthM: colregTargetLengthM },
+        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, seaplaneOnWater: colregOwnSeaplaneOnWater, makingWay: colregOwnMakingWay, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes", lengthM: colregOwnLengthM },
+        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, seaplaneOnWater: colregTargetSeaplaneOnWater, makingWay: colregTargetMakingWay, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes", lengthM: colregTargetLengthM },
         environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, targetNavigatingChannel: colregTargetNavigatingChannel, ownInshoreTrafficZone: colregOwnInshoreZone, targetWindwardOfOwn: colregTargetWindwardOfOwn === "unknown" ? null : colregTargetWindwardOfOwn === "yes", ownOvertakingNotClear: colregOwnOvertakingNotClear, targetOvertakingNotClear: colregTargetOvertakingNotClear, bearingHistoryDeg: selectedColregHistory.slice(-8).map((sample) => (Math.atan2(sample.xNm, sample.yNm) * 180 / Math.PI + 360) % 360), rangeHistoryNm: selectedColregHistory.slice(-8).map((sample) => Math.hypot(sample.xNm, sample.yNm)), riskDcpaNm: alertDcpaNm },
       })
     : null;
@@ -342,8 +346,8 @@ export default function App() {
     : colregAssessment.rule7RiskIndication ? "Возможная опасность: пеленг практически постоянен, дистанция уменьшается"
     : "Пеленг: " + (colregAssessment.bearingTrend === "insufficient" ? "недостаточно данных" : colregAssessment.bearingTrend === "stable" ? "стабильный" : "изменяется")
       + " · дистанция: " + (colregAssessment.rangeTrend === "insufficient" ? "недостаточно данных" : colregAssessment.rangeTrend === "decreasing" ? "уменьшается" : colregAssessment.rangeTrend === "increasing" ? "увеличивается" : "без изменения");
-  const ownRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregOwnKind, lengthM: colregOwnLengthM, underway: colregOwnKind !== "anchored" && colregOwnKind !== "aground", makingWay: colregOwnMakingWay, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, engagedInFishing: colregOwnFishing }) : null;
-  const targetRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregTargetKind, lengthM: colregTargetLengthM, underway: colregTargetKind !== "anchored" && colregTargetKind !== "aground", makingWay: colregTargetMakingWay, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, engagedInFishing: colregTargetFishing }) : null;
+  const ownRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregOwnKind, lengthM: colregOwnLengthM, underway: colregOwnKind !== "anchored" && colregOwnKind !== "aground", makingWay: colregOwnMakingWay, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, seaplaneOnWater: colregOwnSeaplaneOnWater, engagedInFishing: colregOwnFishing }) : null;
+  const targetRestrictedSignal = colregVisibility === "restricted" ? getRestrictedVisibilitySignal({ kind: colregTargetKind, lengthM: colregTargetLengthM, underway: colregTargetKind !== "anchored" && colregTargetKind !== "aground", makingWay: colregTargetMakingWay, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, seaplaneOnWater: colregTargetSeaplaneOnWater, engagedInFishing: colregTargetFishing }) : null;
   const ownLightRanges = colregAssessment ? getLightVisibilityMinimums(colregOwnLengthM) : null;
   const targetLightRanges = colregAssessment ? getLightVisibilityMinimums(colregTargetLengthM) : null;
   const colregManeuver = selectedColregTarget
@@ -530,8 +534,10 @@ export default function App() {
                 {colregOwnKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnFishing} onChange={(event) => setColregOwnFishing(event.target.checked)}/><span>Собственное судно занято ловом рыбы</span></label>}
                 {colregTargetKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetFishing} onChange={(event) => setColregTargetFishing(event.target.checked)}/><span>Цель занята ловом рыбы</span></label>}
                 {colregOwnKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnMotorUnderSail} onChange={(event) => setColregOwnMotorUnderSail(event.target.checked)}/><span>Двигатель работает под парусами</span></label>}
-                {!["anchored", "aground", "seaplane", "other"].includes(colregOwnKind) && (colregOwnKind !== "wig-craft" || colregOwnWigOnSurface) && <label className="colreg-check"><input type="checkbox" checked={colregOwnMakingWay} onChange={(event) => setColregOwnMakingWay(event.target.checked)}/><span>Собственное судно имеет ход относительно воды</span></label>}
-                {!["anchored", "aground", "seaplane", "other"].includes(colregTargetKind) && (colregTargetKind !== "wig-craft" || colregTargetWigOnSurface) && <label className="colreg-check"><input type="checkbox" checked={colregTargetMakingWay} onChange={(event) => setColregTargetMakingWay(event.target.checked)}/><span>Цель имеет ход относительно воды</span></label>}
+                {!["anchored", "aground", "other"].includes(colregOwnKind) && (colregOwnKind !== "wig-craft" || colregOwnWigOnSurface) && (colregOwnKind !== "seaplane" || colregOwnSeaplaneOnWater) && <label className="colreg-check"><input type="checkbox" checked={colregOwnMakingWay} onChange={(event) => setColregOwnMakingWay(event.target.checked)}/><span>Собственное судно имеет ход относительно воды</span></label>}
+                {!["anchored", "aground", "other"].includes(colregTargetKind) && (colregTargetKind !== "wig-craft" || colregTargetWigOnSurface) && (colregTargetKind !== "seaplane" || colregTargetSeaplaneOnWater) && <label className="colreg-check"><input type="checkbox" checked={colregTargetMakingWay} onChange={(event) => setColregTargetMakingWay(event.target.checked)}/><span>Цель имеет ход относительно воды</span></label>}
+                {colregOwnKind === "seaplane" && <label className="colreg-check"><input type="checkbox" checked={colregOwnSeaplaneOnWater} onChange={(event) => setColregOwnSeaplaneOnWater(event.target.checked)}/><span>Гидросамолёт находится на воде</span></label>}
+                {colregTargetKind === "seaplane" && <label className="colreg-check"><input type="checkbox" checked={colregTargetSeaplaneOnWater} onChange={(event) => setColregTargetSeaplaneOnWater(event.target.checked)}/><span>Гидросамолёт-цель находится на воде</span></label>}
                 {colregOwnKind === "wig-craft" && <label className="colreg-check"><input type="checkbox" checked={colregOwnWigOnSurface} onChange={(event) => setColregOwnWigOnSurface(event.target.checked)}/><span>Собственный WIG движется по поверхности воды</span></label>}
                 {colregTargetKind === "wig-craft" && <label className="colreg-check"><input type="checkbox" checked={colregTargetWigOnSurface} onChange={(event) => setColregTargetWigOnSurface(event.target.checked)}/><span>WIG-цель движется по поверхности воды</span></label>}
                 {colregTargetKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetMotorUnderSail} onChange={(event) => setColregTargetMotorUnderSail(event.target.checked)}/><span>Двигатель цели работает под парусами</span></label>}
