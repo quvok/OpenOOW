@@ -18,7 +18,7 @@ export interface RouteWaypoint extends LocalPosition {
 export interface ChartArea {
   id: string;
   name: string;
-  kind: "land" | "shallow";
+  kind: "land" | "shallow" | "charted";
   depthM?: number;
   polygon: LocalPosition[];
 }
@@ -49,11 +49,12 @@ export interface CrossTrackResult {
 export interface RouteAssessment {
   safe: boolean;
   totalDistanceNm: number;
-  minimumChartedDepthM: number;
+  minimumChartedDepthM: number | null;
   requiredDepthM: number;
   landIntersections: string[];
   shallowWaterIntersections: string[];
   hazardIntersections: string[];
+  unchartedIntersections: string[];
   warnings: string[];
 }
 
@@ -145,9 +146,11 @@ export function pointInPolygon(point: LocalPosition, polygon: LocalPosition[]): 
   return inside;
 }
 
-export function chartedDepthAt(position: LocalPosition, areas: ChartArea[], defaultDepthM = 40): number {
-  const containing = areas.filter((area) => area.kind === "shallow" && pointInPolygon(position, area.polygon));
-  return containing.reduce((depth, area) => Math.min(depth, area.depthM ?? defaultDepthM), defaultDepthM);
+export function chartedDepthAt(position: LocalPosition, areas: ChartArea[], defaultDepthM: number | null = null): number | null {
+  const containing = areas.filter((area) =>
+    (area.kind === "charted" || area.kind === "shallow") && pointInPolygon(position, area.polygon));
+  if (!containing.length) return defaultDepthM;
+  return containing.reduce((depth, area) => Math.min(depth, area.depthM ?? defaultDepthM ?? 40), Infinity);
 }
 
 export function assessRoute(
@@ -160,8 +163,9 @@ export function assessRoute(
   const landIntersections = new Set<string>();
   const shallowWaterIntersections = new Set<string>();
   const hazardIntersections = new Set<string>();
+  const unchartedIntersections = new Set<string>();
   const legs = buildRouteLegs(route);
-  let minimumChartedDepthM = 40;
+  let minimumChartedDepthM: number | null = null;
   for (const leg of legs) {
     const samples = Math.max(1, Math.ceil(leg.distanceNm / Math.max(0.01, sampleStepNm)));
     for (let i = 0; i <= samples; i += 1) {
@@ -170,15 +174,21 @@ export function assessRoute(
         eastNm: leg.from.eastNm + (leg.to.eastNm - leg.from.eastNm) * fraction,
         northNm: leg.from.northNm + (leg.to.northNm - leg.from.northNm) * fraction,
       };
+      let isLand = false;
+      let hasDepthCoverage = false;
       for (const area of areas) {
         if (!pointInPolygon(point, area.polygon)) continue;
-        if (area.kind === "land") landIntersections.add(area.name);
-        else {
+        if (area.kind === "land") {
+          landIntersections.add(area.name);
+          isLand = true;
+        } else {
+          hasDepthCoverage = true;
           const depth = area.depthM ?? 40;
-          minimumChartedDepthM = Math.min(minimumChartedDepthM, depth);
+          minimumChartedDepthM = minimumChartedDepthM === null ? depth : Math.min(minimumChartedDepthM, depth);
           if (depth < requiredDepthM) shallowWaterIntersections.add(area.name);
         }
       }
+      if (!isLand && !hasDepthCoverage) unchartedIntersections.add("Участок без данных о глубинах");
       for (const hazard of hazards) {
         if (distanceNm(point, hazard.position) <= hazard.radiusNm) hazardIntersections.add(hazard.name);
       }
@@ -189,19 +199,25 @@ export function assessRoute(
   if (landIntersections.size) warnings.push("Маршрут пересекает сушу: " + [...landIntersections].join(", "));
   if (shallowWaterIntersections.size) warnings.push("Недостаточная картографическая глубина: " + [...shallowWaterIntersections].join(", "));
   if (hazardIntersections.size) warnings.push("Маршрут проходит вблизи навигационных опасностей: " + [...hazardIntersections].join(", "));
+  if (unchartedIntersections.size) warnings.push("Нет данных о глубинах: маршрут проходит по некартографированному участку.");
   return {
-    safe: route.length >= 2 && landIntersections.size === 0 && shallowWaterIntersections.size === 0 && hazardIntersections.size === 0,
+    safe: route.length >= 2 && landIntersections.size === 0 && shallowWaterIntersections.size === 0 && hazardIntersections.size === 0 && unchartedIntersections.size === 0,
     totalDistanceNm: totalRouteDistanceNm(route),
     minimumChartedDepthM,
     requiredDepthM,
     landIntersections: [...landIntersections],
     shallowWaterIntersections: [...shallowWaterIntersections],
     hazardIntersections: [...hazardIntersections],
+    unchartedIntersections: [...unchartedIntersections],
     warnings,
   };
 }
 
 export const TRAINING_CHART_AREAS: ChartArea[] = [
+  { id: "charted-water", name: "Картографированная акватория (учебная)", kind: "charted", depthM: 40, polygon: [
+    { eastNm: -7.1, northNm: -9 }, { eastNm: 7.1, northNm: -9 },
+    { eastNm: 7.1, northNm: 9 }, { eastNm: -7.1, northNm: 9 },
+  ] },
   { id: "west-land", name: "Западный берег", kind: "land", polygon: [
     { eastNm: -12, northNm: -9 }, { eastNm: -12, northNm: 9 }, { eastNm: -8.8, northNm: 9 },
     { eastNm: -7.7, northNm: 6 }, { eastNm: -8.3, northNm: 3 }, { eastNm: -7.2, northNm: 0 },
