@@ -50,6 +50,7 @@ export default function App() {
   const [eblBearingDeg, setEblBearingDeg] = useState(0);
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
+  const [selectedRadarTargetId, setSelectedRadarTargetId] = useState<string | null>(null);
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const [radarMeasurements, setRadarMeasurements] = useState(() => measureRadarContacts({ xNm: 0, yNm: 0 }, ENCOUNTER_SCENARIOS[0].targets, 0, 0));
   const [tracks, setTracks] = useState(() => createRadarMeasurementTrackHistory(radarMeasurements, { xNm: 0, yNm: 0 }));
@@ -209,6 +210,9 @@ export default function App() {
   const vrmRadiusPx = (vrmRangeNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
+  const selectedMeasurement = radarMeasurements.find((item) => item.id === selectedRadarTargetId) ?? null;
+  const selectedTrack = selectedRadarTargetId ? arpaTracks[selectedRadarTargetId] : undefined;
+  const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
   return <main className="app-shell">
     <aside className="sidebar">
@@ -285,11 +289,11 @@ export default function App() {
                   " L" + vector.dx + " " + vector.dy +
                   " L" + (baseX + unitY * wing) + " " + (baseY - unitX * wing)
                 : "";
-              return <g key={target.id}>
+              return <g key={target.id} role="button" tabIndex={0} aria-label={"Выбрать радиолокационную цель " + target.id} aria-pressed={selectedRadarTargetId === target.id} className="radar-contact-hitbox" onClick={() => setSelectedRadarTargetId(target.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedRadarTargetId(target.id); } }}>
                 <g transform={"translate(" + point.x + " " + point.y + ")"}>
                 {estimatedTarget && <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>}
                 {estimatedTarget && vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
-                <circle r="7" className="target-echo"/>
+                <circle r={selectedRadarTargetId === target.id ? 9 : 7} className={selectedRadarTargetId === target.id ? "target-echo selected" : "target-echo"}/>
                 <text x="12" y="4">{target.id}</text>
                 <text x="12" y="17" className="target-course-label">{estimatedTarget ? estimatedTarget.courseDeg.toFixed(0) + "°T" : "RADAR ECHO"}</text>
                 </g>
@@ -302,6 +306,23 @@ export default function App() {
           <div className="radar-tools">
             <div className="radar-tool"><div className="control-title"><label htmlFor="ebl-bearing">EBL · Истинный пеленг</label><strong>{eblBearingDeg.toFixed(0)}° T</strong></div><input id="ebl-bearing" type="range" min="0" max="359" step="1" value={eblBearingDeg} onChange={(event) => setEblBearingDeg(Number(event.target.value))}/><div className="range-labels"><span>000°</span><span>359°</span></div></div>
             <div className="radar-tool"><div className="control-title"><label htmlFor="vrm-range">VRM · Дистанция</label><strong>{vrmRangeNm.toFixed(1)} NM</strong></div><input id="vrm-range" type="range" min="0.1" max="3" step="0.1" value={vrmRangeNm} onChange={(event) => setVrmRangeNm(Number(event.target.value))}/><div className="range-labels"><span>0.1 NM</span><span>3.0 NM</span></div></div>
+          </div>
+          <div className="radar-selection-panel">
+            <div className="panel-heading"><div><span className="eyebrow">MANUAL PLOTTING</span><h2>Измерение выбранной цели</h2></div><span className="unit">{selectedMeasurement ? selectedMeasurement.id : "ЦЕЛЬ НЕ ВЫБРАНА"}</span></div>
+            {selectedMeasurement ? <>
+              <div className="measurement-readouts">
+                <Metric label="ИСТИННЫЙ ПЕЛЕНГ" value={selectedMeasurement.bearingDeg.toFixed(1) + "° T"}/>
+                <Metric label="ДИСТАНЦИЯ" value={selectedMeasurement.rangeNm.toFixed(2) + " NM"}/>
+                <Metric label="ОТКЛОНЕНИЕ ОТ EBL" value={(eblDifference! >= 0 ? "+" : "−") + Math.abs(eblDifference!).toFixed(1) + "°"}/>
+                <Metric label="ОТКЛОНЕНИЕ ОТ VRM" value={(selectedMeasurement.rangeNm - vrmRangeNm >= 0 ? "+" : "−") + Math.abs(selectedMeasurement.rangeNm - vrmRangeNm).toFixed(2) + " NM"}/>
+              </div>
+              <div className="selection-actions">
+                <span>{selectedTrack ? "Цель уже захвачена в ARPA" : "Цель выбрана на радиолокационной отметке"}</span>
+                {selectedTrack
+                  ? <button className="secondary arpa-action" onClick={() => releaseTarget(selectedMeasurement.id)}>Снять захват</button>
+                  : <button className="primary arpa-action" onClick={() => acquireTarget(selectedMeasurement.id)}>Захватить ARPA</button>}
+              </div>
+            </> : <p className="cpa-note">Нажмите на отметку цели на PPI, чтобы получить измеренный истинный пеленг и дистанцию. Для выбора с клавиатуры используйте Tab и Enter.</p>}
           </div>
         </section>
         <div className="control-column">
@@ -363,13 +384,13 @@ export default function App() {
             </tr>;
           })}
         </tbody></table></div>
-        <p className="cpa-note">Захват выполняется вручную по текущей радиолокационной отметке. Антенна выполняет обзор каждые 2,5 секунды; дальность и пеленг содержат небольшую детерминированную погрешность. ARPA оценивает движение только по измеренным координатам. Пропуск отметок воспроизводится детерминированно; Lost фиксируется при отсутствии измерений более 10 секунд.</p>
+        <p className="cpa-note">Захват выполняется вручную по текущей радиолокационной отметке. Антенна выполняет обзор каждые 2,5 секунды; искусственные погрешности и пропуски отметок отключены. ARPA оценивает движение только по измеренным координатам; Lost фиксируется при отсутствии измерений более 10 секунд.</p>
       </section>
       <section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
       </section>
-      <div className="notice"><b>Ограничение учебной модели:</b> радарный обзор, шум и пропуски отметок являются детерминированной упрощённой моделью. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след строится только по реально полученным радиолокационным отметкам; при пропуске обзора новая точка не добавляется. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
+      <div className="notice"><b>Ограничение учебной модели:</b> искусственные шумы и пропуски отметок отключены; обзор обновляется каждые 2,5 секунды. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след строится только по реально полученным радиолокационным отметкам; при пропуске обзора новая точка не добавляется. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
     </section>
   </main>;
 }
