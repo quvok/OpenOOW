@@ -578,3 +578,10 @@ input[type=range]{accent-color:#a6b58b}
 .target-info-track-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:7px;padding:6px 2px;border-top:1px solid #3d4b51}
 .target-info-detail-panel .target-info-empty{padding:12px;text-align:center;color:#a8b6bb;font:9px 'DM Mono',monospace}
 @media(max-width:560px){.target-info-expanded-blocks{grid-template-columns:repeat(2,minmax(0,1fr));max-height:45vh;overflow-y:auto}.target-info-expanded-blocks button{font-size:8px}.target-info-detail-panel .target-info-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.target-info-detail-panel .target-info-single-heading{flex-wrap:wrap}}
+
+
+/* v0.23.6 — automatic Trial Manoeuvre ROT readout */
+.trial-rot-readout{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0;padding:7px 8px;border:1px solid #536b70;background:#14252a;color:#9eb5b8}
+.trial-rot-readout span{font:8px 'DM Mono',monospace;letter-spacing:.4px}
+.trial-rot-readout b{color:#e1e9df;font:600 12px 'DM Mono',monospace}
+.trial-rot-readout small{color:#8da4a8;font:7px 'DM Mono',monospace;line-height:1.35}
