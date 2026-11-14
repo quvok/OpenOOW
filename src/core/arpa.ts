@@ -33,7 +33,7 @@ export type ArpaTrackSet = Record<string, ArpaTrack>;
 
 const MAX_MEASUREMENTS = 8;
 export const DEFAULT_ARPA_LOST_AFTER_SECONDS = 7.5;
-export const DEFAULT_ARPA_ASSOCIATION_GATE_NM = 0.25;
+export const DEFAULT_ARPA_ASSOCIATION_GATE_NM = 0.05;
 
 export interface ArpaAlertConfig {
   minimumDcpaNm: number;
