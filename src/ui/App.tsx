@@ -182,6 +182,7 @@ export default function App() {
             }
             return {
               ownShip: nextOwnShip,
+              autopilot: autopilotStep.state,
               targets: nextTargets,
               tracks: nextTracks,
               arpa: nextArpa,
