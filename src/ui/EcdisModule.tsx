@@ -36,6 +36,7 @@ function makeWaypoint(index: number, eastNm: number, northNm: number): RouteWayp
 
 export default function EcdisModule({ ship, targets }: Props) {
   const [route, setRoute] = useState<RouteWaypoint[]>([]);
+  const [routeStart, setRouteStart] = useState<{ eastNm: number; northNm: number } | null>(null);
   const [origin, setOrigin] = useState<GeoOrigin>({ latitudeDeg: 0, longitudeDeg: 0 });
   const [draftM, setDraftM] = useState(7.5);
   const [ukcM, setUkcM] = useState(1.5);
@@ -55,11 +56,12 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [statusMessage, setStatusMessage] = useState("Нажмите на карту, чтобы добавить первую маршрутную точку.");
   const ownPosition = { eastNm: ship.eastNm, northNm: ship.northNm };
   const requiredDepthM = draftM + ukcM;
+  const monitoringRoute = useMemo(() => routeStart ? [{ id: "OWN-START", name: "OWN SHIP", ...routeStart }, ...route] : route, [route, routeStart]);
   useEffect(() => {
-    setActiveLegIndex((current) => resolveActiveLegIndex(route, ownPosition, current, arrivalRadiusNm));
-  }, [route, ship.eastNm, ship.northNm, arrivalRadiusNm]);
-  useEffect(() => { setActiveLegIndex(0); }, [route.length]);
-  const activeNavigation = useMemo(() => calculateActiveLegNavigation(route, ownPosition, activeLegIndex), [route, activeLegIndex, ship.eastNm, ship.northNm]);
+    setActiveLegIndex((current) => resolveActiveLegIndex(monitoringRoute, ownPosition, current, arrivalRadiusNm));
+  }, [monitoringRoute, ship.eastNm, ship.northNm, arrivalRadiusNm]);
+  useEffect(() => { setActiveLegIndex(0); }, [route.length, routeStart]);
+  const activeNavigation = useMemo(() => calculateActiveLegNavigation(monitoringRoute, ownPosition, activeLegIndex), [monitoringRoute, activeLegIndex, ship.eastNm, ship.northNm]);
   const crossTrack = useMemo(() => {
     if (!activeNavigation) return null;
     const fraction = activeNavigation.alongTrackNm / Math.max(activeNavigation.legLengthNm, 1e-9);
@@ -89,6 +91,7 @@ export default function EcdisModule({ ship, targets }: Props) {
     const py = (event.clientY - rect.top) * HEIGHT / rect.height;
     const eastNm = ship.eastNm + (px - CENTER_X) / (SCALE * chartScale);
     const northNm = ship.northNm + (CENTER_Y - py) / (SCALE * chartScale);
+    setRouteStart((current) => current ?? ownPosition);
     setRoute((current) => [...current, makeWaypoint(current.length + 1, Number(eastNm.toFixed(3)), Number(northNm.toFixed(3)))]);
     setActiveLegIndex(0);
     setStatusMessage("Маршрутная точка добавлена. Продолжайте прокладку или отключите режим редактирования.");
@@ -101,6 +104,7 @@ export default function EcdisModule({ ship, targets }: Props) {
 
   const clearRoute = () => {
     setRoute([]);
+    setRouteStart(null);
     setActiveLegIndex(0);
     setSelectedWaypointId(null);
     setStatusMessage("Маршрут очищен.");
@@ -158,6 +162,7 @@ export default function EcdisModule({ ship, targets }: Props) {
         return { ...makeWaypoint(index + 1, Number(local.eastNm.toFixed(3)), Number(local.northNm.toFixed(3))),
           name: point.getElementsByTagNameNS("*", "name")[0]?.textContent?.trim() || "WP " + String(index + 1).padStart(2, "0") };
       });
+      setRouteStart(ownPosition);
       setRoute(imported);
       setActiveLegIndex(0);
       setSelectedWaypointId(null);
