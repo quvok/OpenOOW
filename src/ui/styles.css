@@ -531,3 +531,10 @@ input[type=range]{accent-color:#a6b58b}
 .target-info-unavailable p{color:#a7b7bb}
 .target-info-menu{display:none!important}
 @media(max-width:700px){.target-info-section{padding:8px}.target-info-section>h3{font-size:9px}.target-info-section .target-info-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Targets Information menu navigates to the four complete instrument panels */
+.target-block-menu{display:flex;flex-direction:column;gap:0;position:relative;z-index:5;border:1px solid #65747a;background:#18262d;box-shadow:0 8px 18px #0008}
+.target-block-menu a{display:block;padding:10px 12px;color:#e5ecee;text-decoration:none;border-bottom:1px solid #40515a;font:600 10px 'DM Mono',monospace}
+.target-block-menu a:last-child{border-bottom:0}
+.target-block-menu a:hover,.target-block-menu a:focus{background:#35474f;color:#f0dba7;outline:1px solid #bda66c}
+#panel-arpa-display,#panel-arpa-targets,#panel-colreg-assessment,#panel-autopilot{scroll-margin-top:18px}
