@@ -4,7 +4,7 @@ import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
-import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, type ArpaTrackSet } from "../core/arpa";
+import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
@@ -55,6 +55,8 @@ export default function App() {
   const [radarMeasurements, setRadarMeasurements] = useState(() => measureRadarContacts({ xNm: 0, yNm: 0 }, ENCOUNTER_SCENARIOS[0].targets, 0, 0));
   const [tracks, setTracks] = useState(() => createRadarMeasurementTrackHistory(radarMeasurements, { xNm: 0, yNm: 0 }));
   const [arpaTracks, setArpaTracks] = useState<ArpaTrackSet>({});
+  const [alertDcpaNm, setAlertDcpaNm] = useState(DEFAULT_ARPA_ALERT_CONFIG.minimumDcpaNm);
+  const [alertTcpaMinutes, setAlertTcpaMinutes] = useState(DEFAULT_ARPA_ALERT_CONFIG.maximumTcpaMinutes);
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
@@ -107,7 +109,7 @@ export default function App() {
               );
               nextScan = { lastScanSeconds: nextOwnShip.elapsedSeconds, scanNumber };
               nextTracks = recordRadarMeasurementTracks(current.tracks, nextMeasurements, 240, { xNm: nextOwnShip.eastNm, yNm: nextOwnShip.northNm });
-              nextArpa = updateArpaTracks(current.arpa, nextMeasurements, nextOwnShip.elapsedSeconds, 10);
+              nextArpa = updateArpaTracks(current.arpa, nextMeasurements, nextOwnShip.elapsedSeconds, DEFAULT_ARPA_LOST_AFTER_SECONDS);
             }
             return {
               ownShip: nextOwnShip,
@@ -221,7 +223,7 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.11.0</div>
+      <div className="sidebar-foot">SIM CORE · 0.13.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
@@ -365,12 +367,18 @@ export default function App() {
       </section>
       <section className="panel cpa-panel arpa-panel">
         <div className="panel-heading"><div><span className="eyebrow">AUTOMATIC RADAR PLOTTING AID</span><h2>ARPA · Захват и сопровождение</h2></div><span className="unit">{Object.keys(arpaTracks).length} ЗАХВАЧЕНО</span></div>
-        <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>Цель</th><th>Статус</th><th>Оценка курса / скорости</th><th>TCPA</th><th>DCPA</th><th>Действие</th></tr></thead><tbody>
+        <div className="arpa-alert-settings">
+          <label>Порог DCPA, NM <input type="number" min="0" max="10" step="0.1" value={alertDcpaNm} onChange={(event) => setAlertDcpaNm(Math.max(0, Math.min(10, Number(event.target.value) || 0)))}/></label>
+          <label>Окно TCPA, min <input type="number" min="1" max="120" step="1" value={alertTcpaMinutes} onChange={(event) => setAlertTcpaMinutes(Math.max(1, Math.min(120, Number(event.target.value) || 1)))}/></label>
+          <span>Учебные пороги, не норматив COLREG</span>
+        </div>
+        <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>Цель</th><th>Статус</th><th>Оценка курса / скорости</th><th>TCPA</th><th>DCPA</th><th>Тревога</th><th>Действие</th></tr></thead><tbody>
           {targets.map((target) => {
             const track = arpaTracks[target.id];
             const latestMeasurement = radarMeasurements.find((item) => item.id === target.id) ??
               (track?.measurements.length ? track.measurements[track.measurements.length - 1] : null);
             const solution = track && latestMeasurement ? calculateArpaSolution(track, latestMeasurement, ownVessel) : null;
+            const closeApproachAlert = track && solution ? isArpaCloseApproachAlert(track, solution, { minimumDcpaNm: alertDcpaNm, maximumTcpaMinutes: alertTcpaMinutes }) : false;
             const statusLabel = !track ? "Не захвачена" : track.status === "acquiring" ? "Захват" : track.status === "tracking" ? "Сопровождение" : "Потеряна";
             return <tr key={target.id}>
               <td>{target.id}</td>
@@ -380,11 +388,12 @@ export default function App() {
                 : "Недостаточно данных"}</td>
               <td>{solution ? formatMinutes(solution.tcpaMin) : "—"}</td>
               <td>{solution?.dcpaNm !== null && solution?.dcpaNm !== undefined ? solution.dcpaNm.toFixed(2) + " NM" : "—"}</td>
+              <td><span className={closeApproachAlert ? "arpa-alert active" : "arpa-alert"}>{closeApproachAlert ? "ОПАСНОЕ СБЛИЖЕНИЕ" : "—"}</span></td>
               <td>{track ? <button className="secondary arpa-action" onClick={() => releaseTarget(target.id)}>Снять</button> : <button className="primary arpa-action" disabled={!radarMeasurements.some((item) => item.id === target.id)} onClick={() => acquireTarget(target.id)}>Захватить</button>}</td>
             </tr>;
           })}
         </tbody></table></div>
-        <p className="cpa-note">Захват выполняется вручную по текущей радиолокационной отметке. Антенна выполняет обзор каждые 2,5 секунды; искусственные погрешности и пропуски отметок отключены. ARPA оценивает движение только по измеренным координатам; Lost фиксируется при отсутствии измерений более 10 секунд.</p>
+        <p className="cpa-note">Захват выполняется вручную по радиолокационной отметке. Обзор — каждые 2,5 секунды; искусственные погрешности и пропуски отключены. Lost фиксируется после трёх пропущенных обзоров (7,5 с). При повторном появлении отметки захват начинается заново, чтобы старые измерения не искажали оценку. Тревога активна только для сопровождаемой цели при положительном TCPA в заданном окне и DCPA ниже выбранного порога. Это учебная сигнализация, а не универсальный норматив безопасного расхождения.</p>
       </section>
       <section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
