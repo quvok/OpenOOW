@@ -11,7 +11,6 @@ import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } fro
 
 const STEP_SECONDS = 0.1;
 const RADAR_RANGE_NM = 3;
-const RADAR_VECTOR_MINUTES = 6;
 const RADAR_CENTER = 250;
 const RADAR_RADIUS_PX = 220;
 
@@ -329,7 +328,7 @@ export default function App() {
               <div className="selection-actions">
                 <span>{selectedTrack ? "Цель уже захвачена в ARPA" : "Цель выбрана на радиолокационной отметке"}</span>
                 {selectedTrack
-                  ? <button className="secondary arpa-action" onClick={() => releaseTarget(selectedMeasurement.id)}>Снять захват</button>
+                  ? <button className="secondary arpa-action" onClick={() => releaseTarget(selectedTrack.targetId)}>Снять захват</button>
                   : <button className="primary arpa-action" onClick={() => acquireTarget(selectedMeasurement.id)}>Захватить ARPA</button>}
               </div>
             </> : <p className="cpa-note">Нажмите на отметку цели на PPI, чтобы получить измеренный истинный пеленг и дистанцию. Для выбора с клавиатуры используйте Tab и Enter.</p>}
