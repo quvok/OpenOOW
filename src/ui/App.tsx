@@ -224,19 +224,21 @@ export default function App() {
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
   return <main className="app-shell">
-    <aside className="sidebar">
-      <div className="brand"><Ship size={24}/><span>OpenOOW</span></div>
-      <div className="side-label">ТРЕНАЖЁР</div>
-      <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
-      <div className="side-link"><Anchor size={17}/>Маневрирование</div>
-      <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.14.0</div>
-    </aside>
+
     <section className="workspace">
-      <header className="topbar">
-        <div><div className="eyebrow">OPENOOW / УЧЕБНЫЙ РЕЖИМ</div><h1>Расхождение с судами</h1></div>
-        <div className={running ? "status live" : "status"}><i/>{running ? "СИМУЛЯЦИЯ ЗАПУЩЕНА" : "ПАУЗА"}</div>
+      <header className="topbar transas-topbar">
+        <div className="equipment-brand"><span className="equipment-mark">O</span><div><b>OPENOOW</b><small>RADAR / ARPA SIMULATOR</small></div></div>
+        <div className="equipment-title"><strong>RADAR</strong><span>{activeScenario.title}</span></div>
+        <div className={running ? "status live" : "status"}><i/>{running ? "TRANSMITTING" : "STANDBY"}</div>
       </header>
+      <div className="instrument-strip">
+        <span><small>HDG</small><b>{ship.headingDeg.toFixed(0)}°T</b></span>
+        <span><small>SPD</small><b>{ship.speedKn.toFixed(1)} kn</b></span>
+        <span><small>ROT</small><b>{(ship.yawRateDegPerSec*60).toFixed(1)}°/min</b></span>
+        <span><small>RANGE</small><b>{RADAR_RANGE_NM.toFixed(1)} NM</b></span>
+        <span><small>SCAN</small><b>2.5 s</b></span>
+        <span><small>TIME</small><b>{formatTime(ship.elapsedSeconds)}</b></span>
+      </div>
       <section className="panel scenario-picker">
         <div className="scenario-picker-top">
           <div><span className="eyebrow">УЧЕБНЫЕ СИТУАЦИИ</span><h2>Выбор сценария</h2></div>
@@ -257,14 +259,34 @@ export default function App() {
         </div>
       </section>
       <div className="main-grid">
-        <section className="panel radar-panel">
-          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · SCAN 2.5 S · VECTOR {vectorMinutes} MIN</span></div>
+        <section className="panel radar-panel transas-radar-panel">
+          <div className="panel-heading radar-heading"><div><span className="eyebrow">PPI DISPLAY</span><h2>RELATIVE POSITION INDICATOR</h2></div><span className="unit">NORTH UP · {vectorMode.toUpperCase()} VECTOR · {vectorMinutes} MIN</span></div>
           <div className="vector-mode-control"><span>ВЕКТОРЫ ARPA</span><div><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>Истинные</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>Относительные</button></div><label className="vector-length-control">Время вектора <strong>{vectorMinutes} мин</strong><input type="range" min="1" max="30" step="1" value={vectorMinutes} onChange={(event) => setVectorMinutes(Number(event.target.value))}/></label></div>
           <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
             {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
             }
             <path d="M250 15V485 M15 250H485" className="radar-cross"/>
+            {Array.from({ length: 12 }, (_, index) => index * 30).map((bearing) => {
+              const angle = bearing * Math.PI / 180;
+              const inner = 222;
+              const outer = 235;
+              const label = 205;
+              const x1 = RADAR_CENTER + Math.sin(angle) * inner;
+              const y1 = RADAR_CENTER - Math.cos(angle) * inner;
+              const x2 = RADAR_CENTER + Math.sin(angle) * outer;
+              const y2 = RADAR_CENTER - Math.cos(angle) * outer;
+              const tx = RADAR_CENTER + Math.sin(angle) * label;
+              const ty = RADAR_CENTER - Math.cos(angle) * label;
+              return <g key={bearing} className="bearing-mark">
+                <line x1={x1} y1={y1} x2={x2} y2={y2}/>
+                <text x={tx} y={ty + 3} textAnchor="middle">{String(bearing).padStart(3, "0")}</text>
+              </g>;
+            })}
+            <g className="range-labels">
+              <text x="258" y="193">0.75</text><text x="258" y="134">1.50</text>
+              <text x="258" y="75">2.25</text><text x="258" y="17">3.00 NM</text>
+            </g>
             <circle cx={x} cy={y} r={vrmRadiusPx} className="vrm-ring"/>
             <path d={"M" + x + " " + y + " L" + eblX + " " + eblY} className="ebl-line"/>
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
@@ -364,6 +386,11 @@ export default function App() {
             </div>
           </section>
         </div>
+      </div>
+      <div className="instrument-footer">
+        <span className={running ? "tx-indicator active" : "tx-indicator"}>{running ? "TX ON" : "TX OFF"}</span>
+        <span>SEA: AUTO</span><span>RAIN: OFF</span><span>GAIN: 75%</span><span>IR: OFF</span>
+        <span className="footer-spacer"></span><span>OPENOOW TRAINING EQUIPMENT</span>
       </div>
       <section className="panel cpa-panel">
         <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ В РЕАЛЬНОМ ВРЕМЕНИ</span><h2>Геометрическая оценка без захвата</h2></div><Target size={18}/></div>
