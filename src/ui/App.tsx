@@ -99,6 +99,7 @@ export default function App() {
   const [colregCrossingTss, setColregCrossingTss] = useState(false);
   const [colregTargetFollowingLane, setColregTargetFollowingLane] = useState(false);
   const [colregTargetChannelLimited, setColregTargetChannelLimited] = useState(false);
+  const [colregTargetNavigatingChannel, setColregTargetNavigatingChannel] = useState(false);
   const [colregOwnInshoreZone, setColregOwnInshoreZone] = useState(false);
   const [colregTargetWindwardOfOwn, setColregTargetWindwardOfOwn] = useState("unknown");
   const [colregOwnOvertakingNotClear, setColregOwnOvertakingNotClear] = useState(false);
@@ -195,6 +196,7 @@ export default function App() {
     const scenario = ENCOUNTER_SCENARIOS.find((item) => item.id === selectedScenarioId);
     if (!scenario) return;
     setRunning(false);
+    setSelectedRadarTargetId(null);
     accumulatorRef.current = 0;
     const nextShip = createScenarioShipState(scenario);
     shipRef.current = nextShip;
@@ -224,6 +226,7 @@ export default function App() {
     setColregCrossingTss(environmentContext?.ownCrossingTrafficLane ?? false);
     setColregTargetFollowingLane(environmentContext?.targetFollowingTrafficLane ?? false);
     setColregTargetChannelLimited(environmentContext?.targetCanOnlyNavigateChannel ?? false);
+    setColregTargetNavigatingChannel(environmentContext?.targetNavigatingChannel ?? false);
     setColregOwnInshoreZone(environmentContext?.ownInshoreTrafficZone ?? false);
     setColregTargetWindwardOfOwn(environmentContext?.targetWindwardOfOwn == null ? "unknown" : environmentContext.targetWindwardOfOwn ? "yes" : "no");
     setColregOwnOvertakingNotClear(environmentContext?.ownOvertakingNotClear ?? false);
@@ -302,7 +305,7 @@ export default function App() {
     ? assessColregEncounter(ownVessel, selectedColregTarget, {
         ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes", lengthM: colregOwnLengthM },
         targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes", lengthM: colregTargetLengthM },
-        environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, ownInshoreTrafficZone: colregOwnInshoreZone, targetWindwardOfOwn: colregTargetWindwardOfOwn === "unknown" ? null : colregTargetWindwardOfOwn === "yes", ownOvertakingNotClear: colregOwnOvertakingNotClear, targetOvertakingNotClear: colregTargetOvertakingNotClear, bearingHistoryDeg: selectedTrack?.measurements.slice(-8).map((measurement) => measurement.bearingDeg), rangeHistoryNm: selectedTrack?.measurements.slice(-8).map((measurement) => measurement.rangeNm), riskDcpaNm: alertDcpaNm },
+        environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, targetNavigatingChannel: colregTargetNavigatingChannel, ownInshoreTrafficZone: colregOwnInshoreZone, targetWindwardOfOwn: colregTargetWindwardOfOwn === "unknown" ? null : colregTargetWindwardOfOwn === "yes", ownOvertakingNotClear: colregOwnOvertakingNotClear, targetOvertakingNotClear: colregTargetOvertakingNotClear, bearingHistoryDeg: selectedTrack?.measurements.slice(-8).map((measurement) => measurement.bearingDeg), rangeHistoryNm: selectedTrack?.measurements.slice(-8).map((measurement) => measurement.rangeNm), riskDcpaNm: alertDcpaNm },
       })
     : null;
   const ownLightRanges = colregAssessment ? getLightVisibilityMinimums(colregOwnLengthM) : null;
@@ -503,10 +506,11 @@ export default function App() {
                 <label><span>Видимость</span><select value={colregVisibility} onChange={(event) => setColregVisibility(event.target.value as "good" | "restricted")}><option value="good">Нормальная</option><option value="restricted">Ограниченная</option></select></label>
                 <label><span>Суда на виду?</span><select value={colregVesselsInSight ? "yes" : "no"} onChange={(event) => setColregVesselsInSight(event.target.value === "yes")}><option value="yes">Да, визуальный контакт</option><option value="no">Нет, обнаружение радаром</option></select></label>
                 <label><span>Время суток</span><select value={colregDaylight ? "day" : "night"} onChange={(event) => setColregDaylight(event.target.value === "day")}><option value="night">Ночь</option><option value="day">День</option></select></label>
-                <label className="colreg-check"><input type="checkbox" checked={colregOwnOvertakingNotClear} onChange={(event) => setColregOwnOvertakingNotClear(event.target.checked)}/><span>Собственное судно обгоняет, ещё не прошло чисто (правило 13)</span></label>
-                <label className="colreg-check"><input type="checkbox" checked={colregTargetOvertakingNotClear} onChange={(event) => setColregTargetOvertakingNotClear(event.target.checked)}/><span>Цель обгоняет, ещё не прошла чисто (правило 13)</span></label>
+                <label className="colreg-check"><input type="checkbox" checked={colregOwnOvertakingNotClear} onChange={(event) => { setColregOwnOvertakingNotClear(event.target.checked); if (event.target.checked) setColregTargetOvertakingNotClear(false); }}/><span>Собственное судно обгоняет, ещё не прошло чисто (правило 13)</span></label>
+                <label className="colreg-check"><input type="checkbox" checked={colregTargetOvertakingNotClear} onChange={(event) => { setColregTargetOvertakingNotClear(event.target.checked); if (event.target.checked) setColregOwnOvertakingNotClear(false); }}/><span>Цель обгоняет, ещё не прошла чисто (правило 13)</span></label>
                 <label className="colreg-check"><input type="checkbox" checked={colregNarrowChannel} onChange={(event) => setColregNarrowChannel(event.target.checked)}/><span>Узкий проход / фарватер (правило 9)</span></label>
                 {colregNarrowChannel && <label className="colreg-check"><input type="checkbox" checked={colregTargetChannelLimited} onChange={(event) => setColregTargetChannelLimited(event.target.checked)}/><span>Цель может безопасно идти только в канале</span></label>}
+                {colregNarrowChannel && <label className="colreg-check"><input type="checkbox" checked={colregTargetNavigatingChannel} onChange={(event) => setColregTargetNavigatingChannel(event.target.checked)}/><span>Цель следует в узком проходе</span></label>}
                 <label className="colreg-check"><input type="checkbox" checked={colregTss} onChange={(event) => setColregTss(event.target.checked)}/><span>Система разделения движения (правило 10)</span></label>
                 {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregCrossingTss} onChange={(event) => setColregCrossingTss(event.target.checked)}/><span>Собственное судно пересекает полосу</span></label>}
                 {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregTargetFollowingLane} onChange={(event) => setColregTargetFollowingLane(event.target.checked)}/><span>Цель следует по полосе движения</span></label>}
