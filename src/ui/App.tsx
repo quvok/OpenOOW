@@ -4,7 +4,7 @@ import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
-import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
+import { acquireArpaTarget, calculateArpaSolution, calculateTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
@@ -50,6 +50,9 @@ export default function App() {
   const [eblBearingDeg, setEblBearingDeg] = useState(0);
   const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [vectorMode, setVectorMode] = useState<RadarVectorMode>("true");
+  const [vectorMinutes, setVectorMinutes] = useState(6);
+  const [trialCourseDeg, setTrialCourseDeg] = useState(ENCOUNTER_SCENARIOS[0].ownShip.courseDeg);
+  const [trialSpeedKn, setTrialSpeedKn] = useState(ENCOUNTER_SCENARIOS[0].ownShip.speedKn);
   const [selectedRadarTargetId, setSelectedRadarTargetId] = useState<string | null>(null);
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const [radarMeasurements, setRadarMeasurements] = useState(() => measureRadarContacts({ xNm: 0, yNm: 0 }, ENCOUNTER_SCENARIOS[0].targets, 0, 0));
@@ -154,6 +157,8 @@ export default function App() {
     shipRef.current = nextShip;
     setShip(nextShip);
     setActiveScenario(scenario);
+    setTrialCourseDeg(scenario.ownShip.courseDeg);
+    setTrialSpeedKn(scenario.ownShip.speedKn);
     const nextTargets = scenario.targets.map((target) => ({ ...target }));
     targetsRef.current = nextTargets;
     setTargets(nextTargets);
@@ -172,6 +177,8 @@ export default function App() {
     setRunning(false);
     accumulatorRef.current = 0;
     const resetShip = createScenarioShipState(activeScenario);
+    setTrialCourseDeg(activeScenario.ownShip.courseDeg);
+    setTrialSpeedKn(activeScenario.ownShip.speedKn);
     shipRef.current = resetShip;
     setShip(resetShip);
     const resetTargets = activeScenario.targets.map((target) => ({ ...target }));
@@ -251,8 +258,8 @@ export default function App() {
       </section>
       <div className="main-grid">
         <section className="panel radar-panel">
-          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · SCAN 2.5 S · VECTOR 6 MIN</span></div>
-          <div className="vector-mode-control"><span>ВЕКТОРЫ ЦЕЛЕЙ</span><div><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>Истинные</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>Относительные</button></div></div>
+          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · SCAN 2.5 S · VECTOR {vectorMinutes} MIN</span></div>
+          <div className="vector-mode-control"><span>ВЕКТОРЫ ARPA</span><div><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>Истинные</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>Относительные</button></div><label className="vector-length-control">Время вектора <strong>{vectorMinutes} мин</strong><input type="range" min="1" max="30" step="1" value={vectorMinutes} onChange={(event) => setVectorMinutes(Number(event.target.value))}/></label></div>
           <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
             {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
@@ -272,13 +279,13 @@ export default function App() {
             {radarMeasurements.map((measurement) => {
               const target = targets.find((item) => item.id === measurement.id);
               if (!target) return null;
-              const track = arpaTracks[measurement.id];
+              const track = Object.values(arpaTracks).find((item) => item.associatedRadarId === measurement.id);
               const point = projectRelativePosition(ownVessel, measurement, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
               const estimatedTarget = track?.estimatedCourseDeg !== null && track?.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
                 ? { courseDeg: track.estimatedCourseDeg, speedKn: track.estimatedSpeedKn }
                 : null;
               const vector = estimatedTarget
-                ? motionVectorToRadar(ownVessel, estimatedTarget, vectorMode, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX)
+                ? motionVectorToRadar(ownVessel, estimatedTarget, vectorMode, vectorMinutes, RADAR_RANGE_NM, RADAR_RADIUS_PX)
                 : { dx: 0, dy: 0 };
               const vectorLength = Math.hypot(vector.dx, vector.dy);
               const unitX = vectorLength > 0 ? vector.dx / vectorLength : 0;
@@ -372,28 +379,37 @@ export default function App() {
           <label>Окно TCPA, min <input type="number" min="1" max="120" step="1" value={alertTcpaMinutes} onChange={(event) => setAlertTcpaMinutes(Math.max(1, Math.min(120, Number(event.target.value) || 1)))}/></label>
           <span>Учебные пороги, не норматив COLREG</span>
         </div>
-        <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>Цель</th><th>Статус</th><th>Оценка курса / скорости</th><th>TCPA</th><th>DCPA</th><th>Тревога</th><th>Действие</th></tr></thead><tbody>
-          {targets.map((target) => {
-            const track = arpaTracks[target.id];
-            const latestMeasurement = radarMeasurements.find((item) => item.id === target.id) ??
-              (track?.measurements.length ? track.measurements[track.measurements.length - 1] : null);
-            const solution = track && latestMeasurement ? calculateArpaSolution(track, latestMeasurement, ownVessel) : null;
-            const closeApproachAlert = track && solution ? isArpaCloseApproachAlert(track, solution, { minimumDcpaNm: alertDcpaNm, maximumTcpaMinutes: alertTcpaMinutes }) : false;
-            const statusLabel = !track ? "Не захвачена" : track.status === "acquiring" ? "Захват" : track.status === "tracking" ? "Сопровождение" : "Потеряна";
-            return <tr key={target.id}>
-              <td>{target.id}</td>
-              <td><span className={"arpa-status " + (track?.status ?? "idle")}>{statusLabel}</span></td>
-              <td>{track?.estimatedCourseDeg !== null && track?.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
-                ? track.estimatedCourseDeg.toFixed(1) + "°T / " + track.estimatedSpeedKn.toFixed(1) + " kn"
-                : "Недостаточно данных"}</td>
+        <div className="trial-controls">
+          <div><span className="eyebrow">TRIAL MANOEUVRE · ПРОБНЫЙ МАНЁВР</span><p>Расчёт прогнозируемого CPA/TCPA при гипотетическом курсе и скорости собственного судна. Реальное управление не меняется.</p></div>
+          <label>Пробный курс, °T <input type="number" min="0" max="359" step="1" value={trialCourseDeg} onChange={(event) => setTrialCourseDeg(Math.max(0, Math.min(359, Number(event.target.value) || 0)))}/></label>
+          <label>Пробная скорость, kn <input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={(event) => setTrialSpeedKn(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></label>
+          <button type="button" className="secondary arpa-action" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); }}>Текущие параметры</button>
+        </div>
+        <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>ARPA-трек</th><th>Радарная отметка</th><th>Статус</th><th>Курс / скорость</th><th>TCPA</th><th>DCPA</th><th>Trial TCPA</th><th>Trial DCPA</th><th>Событие</th><th>Тревога</th><th>Действие</th></tr></thead><tbody>
+          {Object.values(arpaTracks).map((track) => {
+            const latestMeasurement = radarMeasurements.find((item) => item.id === track.associatedRadarId) ??
+              (track.measurements.length ? track.measurements[track.measurements.length - 1] : null);
+            const solution = latestMeasurement ? calculateArpaSolution(track, latestMeasurement, ownVessel) : null;
+            const trialSolution = latestMeasurement ? calculateTrialManoeuvre(track, latestMeasurement, ownVessel, { courseDeg: trialCourseDeg, speedKn: trialSpeedKn }) : null;
+            const closeApproachAlert = solution ? isArpaCloseApproachAlert(track, solution, { minimumDcpaNm: alertDcpaNm, maximumTcpaMinutes: alertTcpaMinutes }) : false;
+            const statusLabel = track.status === "acquiring" ? "Захват" : track.status === "tracking" ? "Сопровождение" : "Lost";
+            return <tr key={track.targetId}>
+              <td>{track.targetId}</td>
+              <td>{track.associatedRadarId}</td>
+              <td><span className={"arpa-status " + track.status}>{statusLabel}</span></td>
+              <td>{track.estimatedCourseDeg !== null && track.estimatedSpeedKn !== null ? track.estimatedCourseDeg.toFixed(1) + "°T / " + track.estimatedSpeedKn.toFixed(1) + " kn" : "Недостаточно данных"}</td>
               <td>{solution ? formatMinutes(solution.tcpaMin) : "—"}</td>
               <td>{solution?.dcpaNm !== null && solution?.dcpaNm !== undefined ? solution.dcpaNm.toFixed(2) + " NM" : "—"}</td>
+              <td>{trialSolution ? formatMinutes(trialSolution.tcpaMin) : "—"}</td>
+              <td>{trialSolution?.dcpaNm !== null && trialSolution?.dcpaNm !== undefined ? trialSolution.dcpaNm.toFixed(2) + " NM" : "—"}</td>
+              <td><span className={track.swapDetected ? "arpa-swap active" : "arpa-swap"}>{track.swapDetected ? "TARGET SWAP" : track.swapCount > 0 ? "SWAP ×" + track.swapCount : "—"}</span></td>
               <td><span className={closeApproachAlert ? "arpa-alert active" : "arpa-alert"}>{closeApproachAlert ? "ОПАСНОЕ СБЛИЖЕНИЕ" : "—"}</span></td>
-              <td>{track ? <button className="secondary arpa-action" onClick={() => releaseTarget(target.id)}>Снять</button> : <button className="primary arpa-action" disabled={!radarMeasurements.some((item) => item.id === target.id)} onClick={() => acquireTarget(target.id)}>Захватить</button>}</td>
+              <td><button className="secondary arpa-action" onClick={() => releaseTarget(track.targetId)}>Снять</button></td>
             </tr>;
           })}
+          {Object.keys(arpaTracks).length === 0 && <tr><td colSpan={11}>Выберите радиолокационную отметку на PPI и выполните ручной захват.</td></tr>}
         </tbody></table></div>
-        <p className="cpa-note">Захват выполняется вручную по радиолокационной отметке. Обзор — каждые 2,5 секунды; искусственные погрешности и пропуски отключены. Lost фиксируется после трёх пропущенных обзоров (7,5 с). При повторном появлении отметки захват начинается заново, чтобы старые измерения не искажали оценку. Тревога активна только для сопровождаемой цели при положительном TCPA в заданном окне и DCPA ниже выбранного порога. Это учебная сигнализация, а не универсальный норматив безопасного расхождения.</p>
+        <p className="cpa-note">Захват выполняется вручную по радиолокационной отметке. Сопровождение использует только завершённые обзоры радара. Lost фиксируется после трёх пропущенных обзоров (7,5 с). При повторном обнаружении той же отметки трек захватывается заново без старой истории. Target Swap выявляется по прогнозируемому положению и однозначному сопоставлению отметок с активными треками; это упрощённая детерминированная модель, а не сертифицированный алгоритм. Trial Manoeuvre пересчитывает CPA/TCPA для заданных пробных курса и скорости, не меняя реальное движение судна. Тревога — учебная, не норматив COLREG.</p>
       </section>
       <section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
