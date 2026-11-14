@@ -15,3 +15,26 @@ The current simulator does not model AIS data, AIS/ARPA association, separate ST
 ## Limitations
 
 This is a training implementation inspired by the information hierarchy of commercial marine displays, not a copy of proprietary Transas software or a certified ARPA implementation. The association and tracking algorithms remain simplified educational models. Values must not be used for real navigation.
+
+
+## Target Information menu
+
+The arrow in the Targets Information title bar opens a navigation menu:
+- Targets overview: individual target tabs and Multiple view.
+- CPA/TCPA: current closest-approach solution for the selected ARPA track.
+- BCR/BCT: bow-crossing prediction.
+- Past positions: measured history retained by the ARPA track.
+- ARPA tracking: track status and scan count.
+- Trial manoeuvre: dynamic own-ship trial settings and predicted CPA/TCPA.
+- AIS data is shown as unavailable because the simulator has no AIS input stream.
+
+## Dynamic Trial Manoeuvre model
+
+The dynamic trial prediction is calculated independently of live ship state:
+1. Own ship continues on its current course and speed during the configured delay.
+2. After the delay, course changes toward the requested course at the configured ROT.
+3. Speed changes toward the requested speed using separate acceleration and deceleration rates.
+4. Each target continues on its latest measured ARPA velocity; the live ARPA tracking process continues updating independently.
+5. Relative separation is evaluated at one-second intervals over the configured vector horizon. The minimum predicted separation and its time are reported as trial DCPA/TCPA.
+
+This is a deterministic educational model. It does not reproduce a specific manufacturer algorithm, vessel-specific manoeuvring booklet, rudder response, drift, current, wind, or turning-circle model. Trial results are not for real navigation.
