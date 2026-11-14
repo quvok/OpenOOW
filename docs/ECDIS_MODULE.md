@@ -69,3 +69,21 @@ ECDIS размещён на отдельной вкладке верхней п�
 Это **не прямой импорт бинарных ENC**. Файлы S-57/S-101 пока нужно предварительно преобразовать в GeoJSON с помощью внешнего инструмента, например GDAL/OGR, сохранив WGS-84 координаты и атрибуты объектов. Импортёр не выполняет S-57/S-101 decoding, каталогизацию обменного набора, обновления ENC, CATZOC или S-52 portrayal. Не все атрибуты и геометрии ENC сейчас поддерживаются. Для реальной ECDIS этого недостаточно.
 
 Для корректной работы с пользовательской картой задайте Chart Reference origin, совпадающий с географической привязкой локальной системы судна. Если origin не соответствует координатам симуляции, положение судна и карта не совпадут.
+
+
+### Подготовка слоёв S-57 через GDAL/OGR
+
+Для тестовой загрузки S-57 можно экспортировать отдельные слои в GeoJSON в WGS-84, затем выбрать все полученные файлы одновременно в OpenOOW:
+
+```bash
+ogrinfo -ro -so chart.000
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 depare.geojson chart.000 DEPARE
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 land.geojson chart.000 LNDARE
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 depcnt.geojson chart.000 DEPCNT
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 soundg.geojson chart.000 SOUNDG
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 uwtroc.geojson chart.000 UWTROC
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 wrecks.geojson chart.000 WRECKS
+ogr2ogr -f GeoJSON -t_srs EPSG:4326 obstrn.geojson chart.000 OBSTRN
+```
+
+Наличие слоя зависит от конкретной ENC. Экспорт и отображение — только учебный конверсионный путь: он не сохраняет весь ENC exchange set, update sequence, usage band, scale range, SCAMIN, CATZOC и полный набор атрибутов S-57. GeoJSON не является заменой официальной ENC.
