@@ -111,7 +111,7 @@ export default function EcdisModule({ ship, targets }: Props) {
           </defs>
           <rect width={WIDTH} height={HEIGHT} fill="#071a22"/>
           <g transform={mapTransform}>
-            <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="url(#ecdis-grid)"/>
+            <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#ecdis-grid)"/>
             {Array.from({ length: 25 }, (_, index) => index - 12).map((east) => <text key={"e"+east} x={CENTER_X + east * SCALE + 3} y="16" className="ecdis-grid-label">{east} E</text>)}
             {Array.from({ length: 18 }, (_, index) => index - 9).map((north) => <text key={"n"+north} x="4" y={CENTER_Y - north * SCALE - 3} className="ecdis-grid-label">{north} N</text>)}
             {TRAINING_CHART_AREAS.filter((area) => area.kind === "land").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-land"/><polygon points={polygonPoints(area.polygon)} fill="url(#ecdis-land-pattern)"/></g>)}
@@ -124,9 +124,9 @@ export default function EcdisModule({ ship, targets }: Props) {
             {route.map((point,index) => { const p=toScreen(point.eastNm,point.northNm); return <g key={point.id} className="ecdis-waypoint" onClick={(event)=>{event.stopPropagation();setSelectedWaypointId(point.id);}}><circle cx={p.x} cy={p.y} r="9"/><text x={p.x+12} y={p.y-10}>{index+1}</text></g>; })}
             {targets.map((target) => { const p=toScreen(target.xNm,target.yNm); return <g key={target.id} className="ecdis-target"><path d={`M ${p.x} ${p.y-8} L ${p.x+7} ${p.y+7} L ${p.x-7} ${p.y+7} Z`}/><text x={p.x+11} y={p.y+4}>{target.id}</text></g>; })}
             {(() => { const p=toScreen(ownPosition.eastNm,ownPosition.northNm); return <g className="ecdis-own-ship" transform={`translate(${p.x} ${p.y}) rotate(${ship.headingDeg})`}><path d="M0 -15 L8 11 L0 7 L-8 11 Z"/><circle r="19"/></g>; })()}
-            <path d="M 945 75 L 945 28 M 935 42 L 945 28 L 955 42" className="ecdis-north-arrow"/>
-            <text x="945" y="92" textAnchor="middle" className="ecdis-north-label">N</text>
           </g>
+          <path d="M 945 75 L 945 28 M 935 42 L 945 28 L 955 42" className="ecdis-north-arrow"/>
+          <text x="945" y="92" textAnchor="middle" className="ecdis-north-label">N</text>
           <rect x="10" y="10" width="190" height="42" className="ecdis-map-readout-bg"/>
           <text x="20" y="27" className="ecdis-map-readout">OWN SHIP · {ship.headingDeg.toFixed(0)}°T</text>
           <text x="20" y="42" className="ecdis-map-readout">{ship.speedKn.toFixed(1)} kn · {formatCoordinate(geoOwn.latitudeDeg,true)}</text>
