@@ -104,8 +104,7 @@ export function assessColregEncounter(
       rule = "13";
       title = "Вероятная ситуация обгона";
       ownShipDuty = "Если судно является обгоняющим по смыслу правила 13, оно обязано держаться в стороне от пути обгоняемого до окончательного прохода и чистого расхождения. При сомнении считайте себя обгоняющим.";
-    } else if (courseDifference <= headOnCourseTolerance &&
-               Math.abs(180 - courseDifference) <= headOnCourseTolerance &&
+    } else if (Math.abs(180 - courseDifference) <= headOnCourseTolerance &&
                Math.min(ownRelativeBearing, 360 - ownRelativeBearing) <= headOnBearingTolerance) {
       encounter = "head-on";
       rule = "14";
