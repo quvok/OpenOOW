@@ -595,3 +595,9 @@ input[type=range]{accent-color:#a6b58b}
 .ecdis-active-leg{stroke:#f0d27c;stroke-width:3.2;stroke-dasharray:9 4;pointer-events:none}
 .ecdis-wheel-over circle{fill:#e7bd64;fill-opacity:.18;stroke:#f0c96f;stroke-width:2}
 .ecdis-wheel-over text{fill:#f1d58b;font:8px 'DM Mono',monospace;paint-order:stroke;stroke:#071a22;stroke-width:3px;stroke-linejoin:round}
+
+
+/* Imported vector chart layers (GeoJSON WGS-84) */
+.ecdis-imported-contour{fill:none;stroke:#7eb6c2;stroke-width:1.35;stroke-dasharray:4 3;opacity:.9;pointer-events:none}
+.ecdis-imported-sounding circle{fill:#d5e6dc;stroke:#294e55;stroke-width:.8}
+.ecdis-imported-sounding text{fill:#d5e6dc;font:9px 'DM Mono',monospace;paint-order:stroke;stroke:#09202a;stroke-width:2.5px;stroke-linejoin:round;pointer-events:none}
