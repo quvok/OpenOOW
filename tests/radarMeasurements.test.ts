@@ -17,11 +17,12 @@ describe("radar measurement model", () => {
 
   it("applies bounded deterministic range and bearing errors", () => {
     const config: RadarMeasurementConfig = { ...DEFAULT_RADAR_CONFIG, dropoutEveryScans: 0 };
-    const first = measureRadarContacts(own, [target], 2.5, 4, config)[0];
-    const repeated = measureRadarContacts(own, [target], 2.5, 4, config)[0];
+    const eastTarget = { ...target, xNm: 2, yNm: 0 };
+    const first = measureRadarContacts(own, [eastTarget], 2.5, 4, config)[0];
+    const repeated = measureRadarContacts(own, [eastTarget], 2.5, 4, config)[0];
     expect(repeated).toEqual(first);
     expect(Math.abs(first.rangeNm - 2)).toBeLessThanOrEqual(config.rangeErrorNm);
-    expect(Math.abs(first.bearingDeg)).toBeLessThanOrEqual(config.bearingErrorDeg);
+    expect(Math.abs(first.bearingDeg - 90)).toBeLessThanOrEqual(config.bearingErrorDeg);
   });
 
   it("omits contacts outside the configured radar range", () => {
