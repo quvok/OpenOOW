@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assessColregEncounter, evaluateColregManeuver } from "../src/core/colreg";
 import { COLREG_RULES } from "../src/core/colregRules";
-import { getLightVisibilityMinimums, getSoundSignals, getVesselLightGuidance } from "../src/core/colregSignals";
+import { getLightVisibilityMinimums, getSoundSignals, getVesselLightGuidance, LIGHT_DEFINITIONS } from "../src/core/colregSignals";
 import type { VesselState } from "../src/core/navigation";
 
 const own = (courseDeg = 0, speedKn = 10, xNm = 0, yNm = 0): VesselState => ({
@@ -26,6 +26,8 @@ describe("COLREG rule reference", () => {
   });
 
   it("provides manoeuvring, restricted-visibility and distress signal references", () => {
+    expect(LIGHT_DEFINITIONS.length).toBeGreaterThanOrEqual(6);
+    expect(getSoundSignals(32).length).toBeGreaterThan(0);
     expect(getSoundSignals(33).length).toBeGreaterThan(0);
     expect(getSoundSignals(34).some((signal) => signal.pattern === "3 коротких")).toBe(true);
     expect(getSoundSignals(34).some((signal) => signal.pattern.includes("проблеска"))).toBe(true);
