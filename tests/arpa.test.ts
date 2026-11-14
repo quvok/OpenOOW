@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { VesselState } from "../src/core/navigation";
-import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, type ArpaTrackSet } from "../src/core/arpa";
+import {
+  acquireArpaTarget,
+  calculateArpaSolution,
+  updateArpaTracks,
+  isArpaCloseApproachAlert,
+  DEFAULT_ARPA_ALERT_CONFIG,
+  DEFAULT_ARPA_LOST_AFTER_SECONDS,
+  type ArpaTrackSet,
+} from "../src/core/arpa";
 
 const target: VesselState = { id: "T1", xNm: 0, yNm: 2, courseDeg: 180, speedKn: 5 };
 const own: VesselState = { id: "OWN", xNm: 0, yNm: 0, courseDeg: 0, speedKn: 10 };
@@ -36,20 +44,46 @@ describe("ARPA acquisition and tracking", () => {
     expect(solution.dcpaNm).toBeCloseTo(0);
   });
 
-  it("marks a contact lost after the timeout when measurements disappear", () => {
+  it("declares Lost only after three missed 2.5-second sweeps", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
-    tracks = updateArpaTracks(tracks, [], 10.1);
+    expect(DEFAULT_ARPA_LOST_AFTER_SECONDS).toBe(7.5);
+    tracks = updateArpaTracks(tracks, [], 2.5);
+    expect(tracks.T1.status).toBe("acquiring");
+    tracks = updateArpaTracks(tracks, [], 5);
+    expect(tracks.T1.status).toBe("acquiring");
+    tracks = updateArpaTracks(tracks, [], 7.5);
     expect(tracks.T1.status).toBe("lost");
+  });
+
+  it("restarts acquisition from a fresh position when a lost contact reappears", () => {
+    let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
+    tracks = updateArpaTracks(tracks, [], 7.5);
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0.2, yNm: 1.4 }], 10);
+    expect(tracks.T1.status).toBe("acquiring");
+    expect(tracks.T1.measurements).toEqual([{ xNm: 0.2, yNm: 1.4, timeSeconds: 10 }]);
+    expect(tracks.T1.estimatedSpeedKn).toBeNull();
+  });
+
+  it("raises a configurable close-approach training alert for positive TCPA inside limits", () => {
+    const track = { ...acquireArpaTarget(target, 0), status: "tracking" as const, targetVelocityEastKn: 0, targetVelocityNorthKn: -5 };
+    const solution = { rangeNm: 1, bearingDeg: 0, tcpaMin: 8, dcpaNm: 0.2 };
+    expect(isArpaCloseApproachAlert(track, solution)).toBe(true);
+    expect(isArpaCloseApproachAlert(track, { ...solution, tcpaMin: -1 })).toBe(false);
+    expect(isArpaCloseApproachAlert(track, { ...solution, tcpaMin: 16 })).toBe(false);
+    expect(isArpaCloseApproachAlert(track, { ...solution, dcpaNm: 0.7 })).toBe(false);
+    expect(isArpaCloseApproachAlert({ ...track, status: "lost" }, solution)).toBe(false);
+  });
+
+  it("validates alert settings and rejects invalid timing configuration", () => {
+    const tracks = { T1: acquireArpaTarget(target, 0) };
+    expect(() => updateArpaTracks(tracks, [], 5, 0)).toThrow(RangeError);
+    expect(() => isArpaCloseApproachAlert(tracks.T1, { rangeNm: 1, bearingDeg: 0, tcpaMin: 2, dcpaNm: 0.1 }, { minimumDcpaNm: -1, maximumTcpaMinutes: 15 })).toThrow(RangeError);
+    expect(DEFAULT_ARPA_ALERT_CONFIG).toEqual({ minimumDcpaNm: 0.5, maximumTcpaMinutes: 15 });
   });
 
   it("does not append a duplicate measurement at the same scan time", () => {
     const tracks = { T1: acquireArpaTarget(target, 0) };
     const next = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 }], 0);
     expect(next).toBe(tracks);
-  });
-
-  it("rejects invalid timing configuration", () => {
-    const tracks = { T1: acquireArpaTarget(target, 0) };
-    expect(() => updateArpaTracks(tracks, [], 5, 0)).toThrow(RangeError);
   });
 });
