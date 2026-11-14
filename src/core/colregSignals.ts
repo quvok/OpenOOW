@@ -112,6 +112,7 @@ export interface RestrictedVisibilitySignalProfile {
   makingWay: boolean;
   underSailAndPower?: boolean;
   wigOnSurface?: boolean;
+  engagedInFishing?: boolean;
 }
 
 export function getRestrictedVisibilitySignal(profile: RestrictedVisibilitySignalProfile): SoundSignalGuidance | null {
@@ -129,7 +130,7 @@ export function getRestrictedVisibilitySignal(profile: RestrictedVisibilitySigna
   }
   if (profile.kind === "nuc" || profile.kind === "ram" || profile.kind === "constrained-draught" ||
       profile.kind === "sailing" && !profile.underSailAndPower ||
-      profile.kind === "fishing" && true ||
+      profile.kind === "fishing" && profile.engagedInFishing === true ||
       profile.kind === "towing") {
     return { rule: 35, pattern: "1 продолжительный + 2 коротких через интервалы не более 2 минут", meaning: "NUC, RAM, CBD, парусное, рыболовное или буксирующее судно", context: "Правило 35(c); учитывайте дополнительные сигналы буксируемого состава." };
   }
