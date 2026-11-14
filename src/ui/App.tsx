@@ -158,7 +158,7 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.7.0</div>
+      <div className="sidebar-foot">SIM CORE · 0.8.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
@@ -229,7 +229,7 @@ export default function App() {
             <g transform={"translate(" + x + " " + y + ") rotate(" + ship.headingDeg + ")"}><path d="M0 -18 L10 15 L0 9 L-10 15 Z" className="own-ship"/></g>
             <text x="260" y="28">N</text><text x="260" y="270">OWN SHIP</text>
           </svg>
-          <div className="radar-legend"><span><i className="dot own-dot"/>Собственное судно</span><span><i className="dot target-dot"/>Цели</span><span>Шкала: 3 NM</span></div>
+          <div className="radar-legend"><span><i className="dot own-dot"/>Собственное судно</span><span><i className="dot target-dot"/>Цели</span><span><i className="dot trail-dot"/>След цели</span><span>Шкала: 3 NM</span></div>
           <div className="radar-tools">
             <div className="radar-tool"><div className="control-title"><label htmlFor="ebl-bearing">EBL · Истинный пеленг</label><strong>{eblBearingDeg.toFixed(0)}° T</strong></div><input id="ebl-bearing" type="range" min="0" max="359" step="1" value={eblBearingDeg} onChange={(event) => setEblBearingDeg(Number(event.target.value))}/><div className="range-labels"><span>000°</span><span>359°</span></div></div>
             <div className="radar-tool"><div className="control-title"><label htmlFor="vrm-range">VRM · Дистанция</label><strong>{vrmRangeNm.toFixed(1)} NM</strong></div><input id="vrm-range" type="range" min="0.1" max="3" step="0.1" value={vrmRangeNm} onChange={(event) => setVrmRangeNm(Number(event.target.value))}/><div className="range-labels"><span>0.1 NM</span><span>3.0 NM</span></div></div>
