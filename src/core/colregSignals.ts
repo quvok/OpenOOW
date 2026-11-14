@@ -128,10 +128,10 @@ export function getRestrictedVisibilitySignal(profile: RestrictedVisibilitySigna
   if (profile.kind === "aground") {
     return { rule: 35, pattern: "Колокол; три отчётливых удара до и после быстрого звона", meaning: "Судно на мели", context: profile.lengthM >= 100 ? "Для судна 100 м и более также применяется гонг." : "Дополнительный сигнал судна на мели." };
   }
-  if (profile.kind === "nuc" || profile.kind === "ram" || profile.kind === "constrained-draught" ||
+  if (profile.underway && (profile.kind === "nuc" || profile.kind === "ram" || profile.kind === "constrained-draught" ||
       profile.kind === "sailing" && !profile.underSailAndPower ||
       profile.kind === "fishing" && profile.engagedInFishing === true ||
-      profile.kind === "towing") {
+      profile.kind === "towing")) {
     return { rule: 35, pattern: "1 продолжительный + 2 коротких через интервалы не более 2 минут", meaning: "NUC, RAM, CBD, парусное, рыболовное или буксирующее судно", context: "Правило 35(c); учитывайте дополнительные сигналы буксируемого состава." };
   }
   if (profile.kind === "wig-craft" && !profile.wigOnSurface) {
