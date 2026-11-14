@@ -376,7 +376,7 @@ export default function App() {
         <button type="button" className={activeTab === "radar" ? "module-tab active" : "module-tab"} onClick={() => setActiveTab("radar")}><Target size={14}/> RADAR / ARPA</button>
         <button type="button" className={activeTab === "ecdis" ? "module-tab active" : "module-tab"} onClick={() => setActiveTab("ecdis")}><Anchor size={14}/> ECDIS</button>
       </nav>
-      {activeTab === "radar" ? <>{scenarioDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setScenarioDialogOpen(false); }}>
+      <div className="module-view" hidden={activeTab !== "radar"}>{scenarioDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setScenarioDialogOpen(false); }}>
         <section className="scenario-dialog" role="dialog" aria-modal="true" aria-labelledby="scenario-dialog-title">
           <div className="dialog-heading"><div><span className="eyebrow">TRAINING SCENARIOS</span><h2 id="scenario-dialog-title">Выбор учебной ситуации</h2></div><button type="button" className="dialog-close" onClick={() => setScenarioDialogOpen(false)} aria-label="Закрыть">×</button></div>
           <label className="dialog-label" htmlFor="scenario-select">Сценарий</label>
@@ -731,7 +731,7 @@ export default function App() {
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
       </section></details>
       <div className="notice"><b>Ограничение учебной модели:</b> искусственные шумы и пропуски отметок отключены; обзор обновляется каждые 2,5 секунды. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след строится только по реально полученным радиолокационным отметкам; при пропуске обзора новая точка не добавляется. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
-      </> : <EcdisModule ship={ship} targets={targets}/>}
+      </div><div className="module-view" hidden={activeTab !== "ecdis"}><EcdisModule ship={ship} targets={targets}/></div>
     </section>
   </main>;
 }
