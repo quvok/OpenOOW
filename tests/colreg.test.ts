@@ -197,7 +197,7 @@ describe("COLREG context and encounter assessment", () => {
   });
 
   it("overrides a small vessel's Rule 15 stand-on status when Rule 10 says not to impede lane traffic", () => {
-    const result = assessColregEncounter(own(90, 10), target(1, -0.2, 0, 8), {
+    const result = assessColregEncounter(own(90, 10), target(0.5, 0.1, 0, 8), {
       ownProfile: { kind: "power-driven", lengthM: 15 },
       targetProfile: { kind: "power-driven", lengthM: 120 },
       environment: { trafficSeparationScheme: true, targetFollowingTrafficLane: true },
