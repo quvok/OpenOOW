@@ -1,3 +1,4 @@
+import { CALM_ENVIRONMENT, calculateEnvironmentalMotion, type EnvironmentState } from "./environment";
 export interface ShipDynamicsState {
   eastNm: number;
   northNm: number;
@@ -74,6 +75,7 @@ export function stepShip(
   state: ShipDynamicsState,
   dtSeconds: number,
   parameters: ShipModelParameters = DEFAULT_SHIP_PARAMETERS,
+  environment: EnvironmentState = CALM_ENVIRONMENT,
 ): ShipDynamicsState {
   if (!Number.isFinite(dtSeconds) || dtSeconds <= 0 || dtSeconds > 1) {
     throw new RangeError("dtSeconds must be in the interval (0, 1].");
@@ -133,13 +135,13 @@ export function stepShip(
   const headingDelta = yawRateDegPerSec * dtSeconds;
   const headingMid = normalizeHeading(state.headingDeg + headingDelta / 2);
   const headingDeg = normalizeHeading(state.headingDeg + headingDelta);
-  const headingRad = (headingMid * Math.PI) / 180;
-  const distanceNm = (speedKn * dtSeconds) / 3600;
+  const environmentalMotion = calculateEnvironmentalMotion(headingMid, speedKn, environment);
+  const distanceNm = dtSeconds / 3600;
 
   return {
     ...state,
-    eastNm: state.eastNm + Math.sin(headingRad) * distanceNm,
-    northNm: state.northNm + Math.cos(headingRad) * distanceNm,
+    eastNm: state.eastNm + environmentalMotion.eastVelocityKn * distanceNm,
+    northNm: state.northNm + environmentalMotion.northVelocityKn * distanceNm,
     headingDeg,
     speedKn,
     yawRateDegPerSec,
