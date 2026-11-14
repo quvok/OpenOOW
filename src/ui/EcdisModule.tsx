@@ -175,7 +175,7 @@ export default function EcdisModule({ ship, targets }: Props) {
           <div className="ecdis-block-heading"><span>SAFETY CHECK</span><b>ПРОВЕРКА БЕЗОПАСНОСТИ</b></div>
           <div className={routeAssessment.safe ? "ecdis-safety-box safe" : "ecdis-safety-box danger"}>
             <b>{route.length<2?"НЕДОСТАТОЧНО ДАННЫХ":routeAssessment.safe?"ОПАСНОСТИ НЕ ОБНАРУЖЕНЫ":"ОБНАРУЖЕНЫ ОПАСНОСТИ"}</b>
-            <span>Минимальная требуемая глубина: {requiredDepthM.toFixed(1)} м</span>
+            <span>Требуемая глубина: {requiredDepthM.toFixed(1)} м · минимум на маршруте: {routeAssessment.minimumChartedDepthM.toFixed(1)} м</span>
             {routeAssessment.warnings.length ? routeAssessment.warnings.map((warning,index)=><small key={index}>{warning}</small>) : <small>Маршрут не пересекает известные объекты учебной карты.</small>}
           </div>
         </section>
