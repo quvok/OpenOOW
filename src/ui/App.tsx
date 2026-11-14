@@ -373,6 +373,31 @@ export default function App() {
             <div className="console-field"><label htmlFor="vector-time">Длина вектора</label><strong>{vectorMinutes} MIN</strong></div>
             <input id="vector-time" type="range" min="1" max="30" step="1" value={vectorMinutes} onChange={(event) => setVectorMinutes(Number(event.target.value))}/>
           </section>
+          <section className="panel console-panel arpa-live-panel">
+            <div className="panel-heading"><div><span className="eyebrow">ARPA TARGETS</span><h2>Сопровождаемые цели</h2></div><span className="unit">{Object.values(arpaTracks).filter((track) => track.status === "tracking").length} TRACK</span></div>
+            {Object.values(arpaTracks).length > 0 ? <div className="arpa-live-list">
+              {Object.values(arpaTracks).map((track) => {
+                const latest = radarMeasurements.find((item) => item.id === track.associatedRadarId) ??
+                  (track.measurements.length ? track.measurements[track.measurements.length - 1] : null);
+                const solution = latest ? calculateArpaSolution(track, latest, ownVessel) : null;
+                const alert = solution ? isArpaCloseApproachAlert(track, solution, { minimumDcpaNm: alertDcpaNm, maximumTcpaMinutes: alertTcpaMinutes }) : false;
+                return <button type="button" key={track.targetId} className={selectedRadarTargetId === track.associatedRadarId ? "arpa-live-row selected" : "arpa-live-row"} onClick={() => setSelectedRadarTargetId(track.associatedRadarId)}>
+                  <span className="arpa-live-id">{track.targetId}<small>{track.associatedRadarId}</small></span>
+                  <span className="arpa-live-status">{track.status === "tracking" ? "TRACK" : track.status === "acquiring" ? "ACQ" : "LOST"}</span>
+                  <span className="arpa-live-cpa"><b>{solution?.dcpaNm !== null && solution?.dcpaNm !== undefined ? solution.dcpaNm.toFixed(2) : "—"}</b><small> DCPA NM</small></span>
+                  <span className={alert ? "arpa-live-alert active" : "arpa-live-alert"}>{alert ? "!" : " "}</span>
+                </button>;
+              })}
+            </div> : <p className="cpa-note compact-note">Нет захваченных целей. Выберите эхо на PPI и нажмите «Захватить ARPA».</p>}
+            <div className="arpa-threshold-line">ALARM: DCPA {alertDcpaNm.toFixed(1)} NM · TCPA {alertTcpaMinutes} MIN</div>
+          </section>
+          <section className="panel console-panel trial-quick-panel">
+            <div className="panel-heading"><div><span className="eyebrow">TRIAL MANOEUVRE</span><h2>Пробный манёвр</h2></div></div>
+            <div className="console-field"><label htmlFor="trial-course-quick">Курс, °T</label><input id="trial-course-quick" type="number" min="0" max="359" step="1" value={trialCourseDeg} onChange={(event) => setTrialCourseDeg(Math.max(0, Math.min(359, Number(event.target.value) || 0)))}/></div>
+            <div className="console-field"><label htmlFor="trial-speed-quick">Скорость, kn</label><input id="trial-speed-quick" type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={(event) => setTrialSpeedKn(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></div>
+            <button type="button" className="secondary arpa-action trial-reset" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); }}>ТЕКУЩИЕ ПАРАМЕТРЫ</button>
+            <p className="cpa-note compact-note">Гипотетический расчёт. Фактический курс и скорость судна не изменяются.</p>
+          </section>
           <section className="panel">
             <div className="panel-heading"><div><span className="eyebrow">МОСТИК</span><h2>Органы управления</h2></div></div>
             <div className="control-block">
