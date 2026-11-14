@@ -43,6 +43,7 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [xtdNm, setXtdNm] = useState(0.5);
   const [showDepths, setShowDepths] = useState(true);
   const [showHazards, setShowHazards] = useState(true);
+  const [headUp, setHeadUp] = useState(false);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
   const [routeEdit, setRouteEdit] = useState(true);
   const [chartScale, setChartScale] = useState(1);
@@ -82,7 +83,7 @@ export default function EcdisModule({ ship, targets }: Props) {
   const remainingDistance = activeNavigation?.remainingRouteNm ?? routeAssessment.totalDistanceNm;
   const etaMinutes = ship.speedKn > 0.1 ? remainingDistance / ship.speedKn * 60 : null;
   const geoOwn = toGeographicPosition(ownPosition, origin);
-  const mapTransform = "translate(" + (CENTER_X - ship.eastNm * SCALE * chartScale) + " " + (CENTER_Y + ship.northNm * SCALE * chartScale) + ") scale(" + chartScale + ") translate(" + -CENTER_X + " " + -CENTER_Y + ")";
+  const mapTransform = "translate(" + (CENTER_X - ship.eastNm * SCALE * chartScale) + " " + (CENTER_Y + ship.northNm * SCALE * chartScale) + ") scale(" + chartScale + ") translate(" + -CENTER_X + " " + -CENTER_Y + ")" + (headUp ? " rotate(" + -ship.headingDeg + " " + CENTER_X + " " + CENTER_Y + ")" : "");
 
   const addWaypoint = (event: MouseEvent<SVGSVGElement>) => {
     if (!routeEdit) return;
@@ -191,7 +192,7 @@ export default function EcdisModule({ ship, targets }: Props) {
     </div>
     <div className="ecdis-layout">
       <section className="ecdis-chart-panel">
-        <div className="ecdis-map-meta"><span>DISPLAY: OWN SHIP FOLLOW · NORTH UP</span><span>DEPTH UNITS: METRES</span><span>SCALE 1:{Math.round(50000 / chartScale).toLocaleString("ru-RU")}</span></div>
+        <div className="ecdis-map-meta"><span>DISPLAY: OWN SHIP FOLLOW · {headUp ? "HEAD UP" : "NORTH UP"}</span><span>DEPTH UNITS: METRES</span><span>SCALE 1:{Math.round(50000 / chartScale).toLocaleString("ru-RU")}</span></div>
         <svg className="ecdis-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Учебная электронная навигационная карта" onClick={addWaypoint}>
           <defs>
             <pattern id="ecdis-grid" width={SCALE} height={SCALE} patternUnits="userSpaceOnUse">
@@ -229,8 +230,7 @@ export default function EcdisModule({ ship, targets }: Props) {
             {targets.map((target) => { const p=toScreen(target.xNm,target.yNm); return <g key={target.id} className="ecdis-target"><path d={`M ${p.x} ${p.y-8} L ${p.x+7} ${p.y+7} L ${p.x-7} ${p.y+7} Z`}/><text x={p.x+11} y={p.y+4}>{target.id}</text></g>; })}
             {(() => { const p=toScreen(ownPosition.eastNm,ownPosition.northNm); return <g className="ecdis-own-ship" transform={`translate(${p.x} ${p.y}) rotate(${ship.headingDeg})`}><path d="M0 -15 L8 11 L0 7 L-8 11 Z"/><circle r="19"/></g>; })()}
           </g>
-          <path d="M 945 75 L 945 28 M 935 42 L 945 28 L 955 42" className="ecdis-north-arrow"/>
-          <text x="945" y="92" textAnchor="middle" className="ecdis-north-label">N</text>
+          <g transform={headUp ? `rotate(${ship.headingDeg} 945 50)` : undefined}><path d="M 945 75 L 945 28 M 935 42 L 945 28 L 955 42" className="ecdis-north-arrow"/><text x="945" y="92" textAnchor="middle" className="ecdis-north-label">N</text></g>
           <rect x="10" y="10" width="190" height="42" className="ecdis-map-readout-bg"/>
           <text x="20" y="27" className="ecdis-map-readout">OWN SHIP · {ship.headingDeg.toFixed(0)}°T</text>
           <text x="20" y="42" className="ecdis-map-readout">{ship.speedKn.toFixed(1)} kn · {formatCoordinate(geoOwn.latitudeDeg,true)}</text>
@@ -239,6 +239,7 @@ export default function EcdisModule({ ship, targets }: Props) {
         </svg>
         <div className="ecdis-map-legend"><span><i className="ecdis-legend-own"/>Своё судно</span><span><i className="ecdis-legend-target"/>Цель</span><span><i className="ecdis-legend-route"/>Маршрут</span><span><i className="ecdis-legend-danger"/>Опасность</span><span><i className="ecdis-legend-shallow"/>Малая глубина</span></div>
         <div className="ecdis-map-actions">
+          <button type="button" className="ecdis-tool" onClick={() => setHeadUp((value)=>!value)}>{headUp ? "HEAD UP" : "NORTH UP"}</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.min(1.6,Number((value+0.1).toFixed(1))))}>УВЕЛИЧИТЬ</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.max(0.7,Number((value-0.1).toFixed(1))))}>УМЕНЬШИТЬ</button>
           <button type="button" className={showDepths ? "ecdis-tool active" : "ecdis-tool"} onClick={() => setShowDepths((value)=>!value)}>ГЛУБИНЫ</button>
