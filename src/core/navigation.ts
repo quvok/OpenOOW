@@ -1,0 +1,6 @@
+import {DEG_TO_RAD,RAD_TO_DEG,normalize360} from "./units";
+export interface VesselState{id:string;xNm:number;yNm:number;courseDeg:number;speedKn:number}
+export interface CpaResult{tcpaMin:number;dcpaNm:number;bearingDeg:number;rangeNm:number}
+export function velocityFromCourse(courseDeg:number,speedKn:number){const a=courseDeg*DEG_TO_RAD;return{eastKn:speedKn*Math.sin(a),northKn:speedKn*Math.cos(a)}}
+export function calculateCpa(own:VesselState,target:VesselState):CpaResult|null{const rx=target.xNm-own.xNm,ry=target.yNm-own.yNm,rangeNm=Math.hypot(rx,ry);if(rangeNm<1e-9)return null;const a=velocityFromCourse(own.courseDeg,own.speedKn),b=velocityFromCourse(target.courseDeg,target.speedKn),vx=b.eastKn-a.eastKn,vy=b.northKn-a.northKn,v2=vx*vx+vy*vy;if(v2<1e-12)return null;const t=-(rx*vx+ry*vy)/v2,cx=rx+vx*t,cy=ry+vy*t;return{tcpaMin:t*60,dcpaNm:Math.hypot(cx,cy),bearingDeg:normalize360(Math.atan2(rx,ry)*RAD_TO_DEG),rangeNm}}
+export function advanceVessel(v:VesselState,dtSeconds:number):VesselState{const vel=velocityFromCourse(v.courseDeg,v.speedKn),h=dtSeconds/3600;return{...v,xNm:v.xNm+vel.eastKn*h,yNm:v.yNm+vel.northKn*h}}
