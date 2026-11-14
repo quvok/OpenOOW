@@ -6,7 +6,7 @@ import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } fr
 import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
 import { acquireArpaTarget, calculateArpaSolution, calculateBowCrossing, calculateDynamicTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
-import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
+import { DEFAULT_SHIP_PARAMETERS, INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { createAutopilotState, stepAutopilot, type AutopilotState } from "../core/autopilot";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 import { assessColregEncounter, evaluateColregManeuver, type Tack } from "../core/colreg";
@@ -78,7 +78,6 @@ export default function App() {
   const [trialCourseDeg, setTrialCourseDeg] = useState(ENCOUNTER_SCENARIOS[0].ownShip.courseDeg);
   const [trialSpeedKn, setTrialSpeedKn] = useState(ENCOUNTER_SCENARIOS[0].ownShip.speedKn);
   const [trialDelayMin, setTrialDelayMin] = useState(3);
-  const [trialRotDegPerMin, setTrialRotDegPerMin] = useState(3);
   const [trialAcceleration, setTrialAcceleration] = useState(0.5);
   const [trialDeceleration, setTrialDeceleration] = useState(0.5);
   const [trialHorizonMin, setTrialHorizonMin] = useState(20);
@@ -396,7 +395,7 @@ export default function App() {
   }).filter((row): row is NonNullable<typeof row> => row !== null);
   const selectedInfoRow = arpaInfoRows.find((row) => row.track.targetId === targetInfoTab) ??
     arpaInfoRows.find((row) => row.track.associatedRadarId === selectedRadarTargetId) ?? arpaInfoRows[0] ?? null;
-  const selectedTrialSolution = selectedInfoRow ? calculateDynamicTrialManoeuvre(
+  // Trial ROT is estimated from the simulator vessel model at the current speed, using hard-over rudder capability.\n  const trialSpeedRatio = ship.speedKn / DEFAULT_SHIP_PARAMETERS.referenceSpeedKn;\n  const trialSpeedFactor = Math.min(trialSpeedRatio * trialSpeedRatio, 1.5);\n  const trialRotDegPerMin = Math.max(0.1, Math.min(30, DEFAULT_SHIP_PARAMETERS.maxTurnRateDegPerSec * trialSpeedFactor * 60));\n  const selectedTrialSolution = selectedInfoRow ? calculateDynamicTrialManoeuvre(
     selectedInfoRow.track, selectedInfoRow.latest, ownVessel,
     { courseDeg: trialCourseDeg, speedKn: trialSpeedKn, delayMin: trialDelayMin,
       turnRateDegPerMin: trialRotDegPerMin, accelerationKnPerMin: trialAcceleration,
@@ -641,7 +640,7 @@ export default function App() {
                   <label>КУРС °T<input type="number" min="0" max="359" value={trialCourseDeg} onChange={event => setTrialCourseDeg(Math.max(0, Math.min(359, Number(event.target.value) || 0)))}/></label>
                   <label>СКОРОСТЬ kn<input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={event => setTrialSpeedKn(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></label>
                   <label>ЗАДЕРЖКА min<input type="number" min="0" max="30" step="0.5" value={trialDelayMin} onChange={event => setTrialDelayMin(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></label>
-                  <label>ROT °/min<input type="number" min="0.1" max="30" step="0.5" value={trialRotDegPerMin} onChange={event => setTrialRotDegPerMin(Math.max(0.1, Math.min(30, Number(event.target.value) || 0.1)))}/></label>
+                  <div className="trial-rot-readout"><span>РАСЧЁТНЫЙ ROT</span><b>{trialRotDegPerMin.toFixed(1)}°/min</b><small>Авто · по скорости и модели судна</small></div>
                   <label>РАЗГОН kn/min<input type="number" min="0" max="5" step="0.1" value={trialAcceleration} onChange={event => setTrialAcceleration(Math.max(0, Math.min(5, Number(event.target.value) || 0)))}/></label>
                   <label>ЗАМЕДЛ. kn/min<input type="number" min="0" max="5" step="0.1" value={trialDeceleration} onChange={event => setTrialDeceleration(Math.max(0, Math.min(5, Number(event.target.value) || 0)))}/></label>
                   <label>ГОРИЗОНТ min<input type="number" min="1" max="120" value={trialHorizonMin} onChange={event => setTrialHorizonMin(Math.max(1, Math.min(120, Number(event.target.value) || 1)))}/></label>
@@ -871,11 +870,11 @@ export default function App() {
           <label>SET CSE °T <input type="number" min="0" max="359" step="1" value={trialCourseDeg} onChange={e=>setTrialCourseDeg(Math.max(0,Math.min(359,Number(e.target.value)||0)))}/></label>
           <label>SET SPD kn <input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={e=>setTrialSpeedKn(Math.max(0,Math.min(30,Number(e.target.value)||0)))}/></label>
           <label>DELAY min <input type="number" min="0" max="30" step="0.5" value={trialDelayMin} onChange={e=>setTrialDelayMin(Math.max(0,Math.min(30,Number(e.target.value)||0)))}/></label>
-          <label>ROT °/min <input type="number" min="0.1" max="30" step="0.5" value={trialRotDegPerMin} onChange={e=>setTrialRotDegPerMin(Math.max(0.1,Math.min(30,Number(e.target.value)||0.1)))}/></label>
+          <div className="trial-rot-readout"><span>ROT AUTO</span><b>{trialRotDegPerMin.toFixed(1)}°/min</b><small>по текущей скорости судна</small></div>
           <label>ACC kn/min <input type="number" min="0" max="5" step="0.1" value={trialAcceleration} onChange={e=>setTrialAcceleration(Math.max(0,Math.min(5,Number(e.target.value)||0)))}/></label>
           <label>DEC kn/min <input type="number" min="0" max="5" step="0.1" value={trialDeceleration} onChange={e=>setTrialDeceleration(Math.max(0,Math.min(5,Number(e.target.value)||0)))}/></label>
           <label>VECTOR min <input type="number" min="1" max="120" step="1" value={trialHorizonMin} onChange={e=>setTrialHorizonMin(Math.max(1,Math.min(120,Number(e.target.value)||1)))}/></label>
-          <button type="button" className="secondary arpa-action" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); setTrialDelayMin(3); setTrialRotDegPerMin(3); setTrialAcceleration(0.5); setTrialDeceleration(0.5); setTrialHorizonMin(20); }}>RESET TRIAL</button>
+          <button type="button" className="secondary arpa-action" onClick={() => { setTrialCourseDeg(ownVessel.courseDeg); setTrialSpeedKn(ownVessel.speedKn); setTrialDelayMin(3); setTrialAcceleration(0.5); setTrialDeceleration(0.5); setTrialHorizonMin(20); }}>RESET TRIAL</button>
         </div>
         <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>ARPA-трек</th><th>Радарная отметка</th><th>Статус</th><th>Курс / скорость</th><th>TCPA</th><th>DCPA</th><th>Trial TCPA</th><th>Trial DCPA</th><th>Событие</th><th>Тревога</th><th>Действие</th></tr></thead><tbody>
           {Object.values(arpaTracks).map((track) => {
