@@ -8,12 +8,30 @@ import { acquireArpaTarget, calculateArpaSolution, calculateTrialManoeuvre, upda
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
-import { assessColregEncounter } from "../core/colreg";
+import { assessColregEncounter, evaluateColregManeuver, type Tack } from "../core/colreg";
+import type { ColregVesselKind } from "../core/colregSignals";
+import { getSoundSignals } from "../core/colregSignals";
+import { COLREG_RULES } from "../core/colregRules";
 
 const STEP_SECONDS = 0.1;
 const RADAR_RANGE_NM = 3;
 const RADAR_CENTER = 250;
 const RADAR_RADIUS_PX = 220;
+
+const COLREG_VESSEL_OPTIONS: Array<{ value: ColregVesselKind; label: string }> = [
+  { value: "power-driven", label: "Механическое судно" },
+  { value: "sailing", label: "Парусное судно" },
+  { value: "fishing", label: "Рыболовное судно" },
+  { value: "nuc", label: "Не способно управляться (NUC)" },
+  { value: "ram", label: "Ограничено в маневренности (RAM)" },
+  { value: "constrained-draught", label: "Ограничено осадкой (CBD)" },
+  { value: "pilot", label: "Лоцманское судно" },
+  { value: "towing", label: "Буксирующее судно" },
+  { value: "anchored", label: "На якоре" },
+  { value: "aground", label: "На мели" },
+  { value: "seaplane", label: "Гидросамолёт" },
+  { value: "other", label: "Не определено" },
+];
 
 function formatTime(seconds: number) {
   const total = Math.floor(seconds);
@@ -61,6 +79,23 @@ export default function App() {
   const [arpaTracks, setArpaTracks] = useState<ArpaTrackSet>({});
   const [alertDcpaNm, setAlertDcpaNm] = useState(DEFAULT_ARPA_ALERT_CONFIG.minimumDcpaNm);
   const [alertTcpaMinutes, setAlertTcpaMinutes] = useState(DEFAULT_ARPA_ALERT_CONFIG.maximumTcpaMinutes);
+  const [colregOwnKind, setColregOwnKind] = useState<ColregVesselKind>("power-driven");
+  const [colregTargetKind, setColregTargetKind] = useState<ColregVesselKind>("power-driven");
+  const [colregOwnFishing, setColregOwnFishing] = useState(false);
+  const [colregTargetFishing, setColregTargetFishing] = useState(false);
+  const [colregOwnMotorUnderSail, setColregOwnMotorUnderSail] = useState(false);
+  const [colregTargetMotorUnderSail, setColregTargetMotorUnderSail] = useState(false);
+  const [colregOwnTack, setColregOwnTack] = useState<Tack>("unknown");
+  const [colregTargetTack, setColregTargetTack] = useState<Tack>("unknown");
+  const [colregOwnWindward, setColregOwnWindward] = useState("unknown");
+  const [colregTargetWindward, setColregTargetWindward] = useState("unknown");
+  const [colregVisibility, setColregVisibility] = useState<"good" | "restricted">("good");
+  const [colregVesselsInSight, setColregVesselsInSight] = useState(true);
+  const [colregDaylight, setColregDaylight] = useState(false);
+  const [colregNarrowChannel, setColregNarrowChannel] = useState(false);
+  const [colregTss, setColregTss] = useState(false);
+  const [colregCrossingTss, setColregCrossingTss] = useState(false);
+  const [colregTargetFollowingLane, setColregTargetFollowingLane] = useState(false);
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
@@ -158,6 +193,12 @@ export default function App() {
     shipRef.current = nextShip;
     setShip(nextShip);
     setActiveScenario(scenario);
+    setColregVisibility(scenario.visibilityNm <= 2 ? "restricted" : "good");
+    setColregVesselsInSight(scenario.visibilityNm > 2);
+    setColregNarrowChannel(false);
+    setColregTss(false);
+    setColregCrossingTss(false);
+    setColregTargetFollowingLane(false);
     setTrialCourseDeg(scenario.ownShip.courseDeg);
     setTrialSpeedKn(scenario.ownShip.speedKn);
     const nextTargets = scenario.targets.map((target) => ({ ...target }));
@@ -229,7 +270,14 @@ export default function App() {
     ? { id: selectedTrack.targetId, xNm: latestColregMeasurement.xNm, yNm: latestColregMeasurement.yNm, courseDeg: selectedTrack.estimatedCourseDeg, speedKn: selectedTrack.estimatedSpeedKn }
     : null;
   const colregAssessment = selectedColregTarget
-    ? assessColregEncounter(ownVessel, selectedColregTarget, { restrictedVisibility: activeScenario.visibilityNm <= 2, riskDcpaNm: alertDcpaNm })
+    ? assessColregEncounter(ownVessel, selectedColregTarget, {
+        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes" },
+        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes" },
+        environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, riskDcpaNm: alertDcpaNm },
+      })
+    : null;
+  const colregManeuver = selectedColregTarget
+    ? evaluateColregManeuver(ownVessel, { ...ownVessel, courseDeg: trialCourseDeg, speedKn: trialSpeedKn }, selectedColregTarget, selectedColregTarget)
     : null;
   const eblDifference = selectedMeasurement ? ((selectedMeasurement.bearingDeg - eblBearingDeg + 540) % 360) - 180 : null;
 
@@ -401,9 +449,34 @@ export default function App() {
             <div className="arpa-threshold-line">ALARM: DCPA {alertDcpaNm.toFixed(1)} NM · TCPA {alertTcpaMinutes} MIN</div>
           </section>
           <section className="panel console-panel colreg-live-panel">
-            <div className="panel-heading"><div><span className="eyebrow">COLREG ASSESSMENT</span><h2>Оценка ситуации</h2></div><span className="unit">МППСС-72</span></div>
+            <div className="panel-heading"><div><span className="eyebrow">COLREG ASSESSMENT</span><h2>МППСС-72 · контекстная оценка</h2></div><span className="unit">RULES 1–41</span></div>
+            <div className="colreg-context">
+              <div className="colreg-context-heading">ПАРАМЕТРЫ СОБСТВЕННОГО СУДНА И ЦЕЛИ</div>
+              <div className="colreg-context-grid">
+                <label><span>Собственное судно</span><select value={colregOwnKind} onChange={(event) => setColregOwnKind(event.target.value as ColregVesselKind)}>{COLREG_VESSEL_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+                <label><span>Цель</span><select value={colregTargetKind} onChange={(event) => setColregTargetKind(event.target.value as ColregVesselKind)}>{COLREG_VESSEL_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+                {colregOwnKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnFishing} onChange={(event) => setColregOwnFishing(event.target.checked)}/><span>Собственное судно занято ловом рыбы</span></label>}
+                {colregTargetKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetFishing} onChange={(event) => setColregTargetFishing(event.target.checked)}/><span>Цель занята ловом рыбы</span></label>}
+                {colregOwnKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnMotorUnderSail} onChange={(event) => setColregOwnMotorUnderSail(event.target.checked)}/><span>Двигатель работает под парусами</span></label>}
+                {colregTargetKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetMotorUnderSail} onChange={(event) => setColregTargetMotorUnderSail(event.target.checked)}/><span>Двигатель цели работает под парусами</span></label>}
+                {colregOwnKind === "sailing" && !colregOwnMotorUnderSail && <label><span>Галс своего судна</span><select value={colregOwnTack} onChange={(event) => setColregOwnTack(event.target.value as Tack)}><option value="unknown">Не определён</option><option value="port">Левый галс</option><option value="starboard">Правый галс</option></select></label>}
+                {colregTargetKind === "sailing" && !colregTargetMotorUnderSail && <label><span>Галс цели</span><select value={colregTargetTack} onChange={(event) => setColregTargetTack(event.target.value as Tack)}><option value="unknown">Не определён</option><option value="port">Левый галс</option><option value="starboard">Правый галс</option></select></label>}
+                {colregOwnKind === "sailing" && !colregOwnMotorUnderSail && colregOwnTack === colregTargetTack && <label><span>Своё судно наветренное?</span><select value={colregOwnWindward} onChange={(event) => setColregOwnWindward(event.target.value)}><option value="unknown">Неизвестно</option><option value="yes">Да</option><option value="no">Нет</option></select></label>}
+                {colregTargetKind === "sailing" && !colregTargetMotorUnderSail && colregOwnTack === colregTargetTack && <label><span>Цель наветренная?</span><select value={colregTargetWindward} onChange={(event) => setColregTargetWindward(event.target.value)}><option value="unknown">Неизвестно</option><option value="yes">Да</option><option value="no">Нет</option></select></label>}
+              </div>
+              <div className="colreg-context-heading">УСЛОВИЯ НАВИГАЦИИ</div>
+              <div className="colreg-context-grid">
+                <label><span>Видимость</span><select value={colregVisibility} onChange={(event) => setColregVisibility(event.target.value as "good" | "restricted")}><option value="good">Нормальная</option><option value="restricted">Ограниченная</option></select></label>
+                <label><span>Суда на виду?</span><select value={colregVesselsInSight ? "yes" : "no"} onChange={(event) => setColregVesselsInSight(event.target.value === "yes")}><option value="yes">Да, визуальный контакт</option><option value="no">Нет, обнаружение радаром</option></select></label>
+                <label><span>Время суток</span><select value={colregDaylight ? "day" : "night"} onChange={(event) => setColregDaylight(event.target.value === "day")}><option value="night">Ночь</option><option value="day">День</option></select></label>
+                <label className="colreg-check"><input type="checkbox" checked={colregNarrowChannel} onChange={(event) => setColregNarrowChannel(event.target.checked)}/><span>Узкий проход / фарватер (правило 9)</span></label>
+                <label className="colreg-check"><input type="checkbox" checked={colregTss} onChange={(event) => setColregTss(event.target.checked)}/><span>Система разделения движения (правило 10)</span></label>
+                {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregCrossingTss} onChange={(event) => setColregCrossingTss(event.target.checked)}/><span>Собственное судно пересекает полосу</span></label>}
+                {colregTss && <label className="colreg-check"><input type="checkbox" checked={colregTargetFollowingLane} onChange={(event) => setColregTargetFollowingLane(event.target.checked)}/><span>Цель следует по полосе движения</span></label>}
+              </div>
+            </div>
             {colregAssessment ? <>
-              <div className="colreg-rule-line"><strong>{colregAssessment.rule ? "ПРАВИЛО " + colregAssessment.rule : "ПРАВИЛО НЕ ОПРЕДЕЛЕНО"}</strong><span>{colregAssessment.collisionRisk === "risk" ? "CPA RISK" : colregAssessment.collisionRisk === "no-immediate-risk" ? "NO IMMEDIATE RISK" : "CPA N/A"}</span></div>
+              <div className="colreg-rule-line"><strong>{colregAssessment.primaryRule ? "ПРАВИЛО " + colregAssessment.primaryRule : "ПРАВИЛО НЕ ОПРЕДЕЛЕНО"}</strong><span>{colregAssessment.responsibility === "give-way" ? "GIVE-WAY" : colregAssessment.responsibility === "stand-on" ? "STAND-ON" : colregAssessment.responsibility === "no-specific-duty" ? "NO AUTOMATIC PRIORITY" : "CHECK CONTEXT"} · {colregAssessment.collisionRisk === "risk" ? "CPA RISK" : colregAssessment.collisionRisk === "no-immediate-risk" ? "NO IMMEDIATE RISK" : "CPA N/A"}</span></div>
               <h3 className="colreg-title">{colregAssessment.title}</h3>
               <p className="colreg-duty">{colregAssessment.ownShipDuty}</p>
               <div className="colreg-readouts">
@@ -412,9 +485,15 @@ export default function App() {
                 <div><small>DCPA</small><b>{colregAssessment.dcpaNm === null ? "—" : colregAssessment.dcpaNm.toFixed(2) + " NM"}</b></div>
                 <div><small>TCPA</small><b>{colregAssessment.tcpaMin === null ? "—" : formatMinutes(colregAssessment.tcpaMin)}</b></div>
               </div>
+              <div className="colreg-applicable-rules"><b>Применимые обязанности</b>{colregAssessment.applicableRules.map((item, index) => <div key={item.rule + "-" + index}><strong>П{item.rule} · {item.title}</strong><span>{item.duty}</span></div>)}</div>
+              {colregManeuver && <div className="colreg-maneuver"><b>Проверка пробного манёвра</b><strong className={colregManeuver.cpaTrend}>{colregManeuver.cpaTrend === "improved" ? "CPA УЛУЧШАЕТСЯ" : colregManeuver.cpaTrend === "degraded" ? "CPA УХУДШАЕТСЯ" : colregManeuver.cpaTrend === "unchanged" ? "БЕЗ СУЩЕСТВЕННЫХ ИЗМЕНЕНИЙ" : "НЕДОСТАТОЧНО ДАННЫХ"}</strong><span>{colregManeuver.observation}</span><small>{colregManeuver.caution}</small></div>}
+              <details className="colreg-signals"><summary>Огни и знаки: {colregAssessment.ownLightGuidance.title}</summary><b>Собственное судно · правило {colregAssessment.ownLightGuidance.rule}</b><ul>{colregAssessment.ownLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>{colregAssessment.ownLightGuidance.dayShapes.length > 0 && <><b>Дневные знаки</b><ul>{colregAssessment.ownLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul></>}</details>
+              <details className="colreg-signals"><summary>Огни и знаки цели: {colregAssessment.targetLightGuidance.title}</summary><b>Цель · правило {colregAssessment.targetLightGuidance.rule}</b><ul>{colregAssessment.targetLightGuidance.lights.map((item) => <li key={item}>{item}</li>)}</ul>{colregAssessment.targetLightGuidance.dayShapes.length > 0 && <><b>Дневные знаки</b><ul>{colregAssessment.targetLightGuidance.dayShapes.map((item) => <li key={item}>{item}</li>)}</ul>}</details>
+              <details className="colreg-signals"><summary>Звуковые сигналы · правила 34–37</summary>{getSoundSignals().map((signal, index) => <div className="colreg-signal-row" key={signal.rule + "-" + index}><b>П{signal.rule} · {signal.pattern}</b><span>{signal.meaning}</span><small>{signal.context}</small></div>)}</details>
               <details className="colreg-limitations"><summary>Ограничения автоматической оценки</summary><ul>{colregAssessment.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
-            </> : <p className="cpa-note compact-note">Выберите отметку на PPI, захватите её в ARPA и дождитесь статуса TRACK. Для классификации используются измеренное положение и оценённые ARPA курс/скорость, а не скрытые параметры сценария.</p>}
-            <p className="cpa-note compact-note">Учебная подсказка. Для правила 19 сценарий ограниченной видимости условно предполагает, что суда не находятся в виду друг друга. Это не юридическое заключение и не команда к манёвру.</p>
+            </> : <p className="cpa-note compact-note">Выберите отметку на PPI, захватите её в ARPA и дождитесь статуса TRACK. После этого оценка использует измеренное положение и оценённые ARPA курс/скорость. Контекст судов и навигации можно задать выше.</p>}
+            <details className="colreg-rulebook"><summary>Справочник МППСС-72 · все правила 1–41</summary>{COLREG_RULES.map((rule) => <div className="colreg-rulebook-row" key={rule.number}><strong>Правило {rule.number} · {rule.title}</strong><small>{rule.part}{rule.operational ? "" : " · административная часть"}</small><span>{rule.summary}</span></div>)}</details>
+            <p className="cpa-note compact-note">Учебная оценка не распознаёт огни/знаки автоматически и не является юридическим заключением или командой к манёвру. Правила 39–41 относятся к проверке выполнения Конвенции государствами, а не к расхождению судов.</p>
           </section>
           <section className="panel console-panel trial-quick-panel">
             <div className="panel-heading"><div><span className="eyebrow">TRIAL MANOEUVRE</span><h2>Пробный манёвр</h2></div></div>
