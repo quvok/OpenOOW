@@ -370,3 +370,90 @@ export function calculateBowCrossing(
   const bcrNm = (east + relativeEast * timeHours) * alongEast + (north + relativeNorth * timeHours) * alongNorth;
   return { bcrNm, bctMin: timeHours * 60 };
 }
+
+
+export interface DynamicTrialManoeuvre extends TrialManoeuvre {
+  /** Delay before own ship starts turning/changing speed, minutes. */
+  delayMin: number;
+  /** Assumed constant rate of turn after the delay, degrees per minute. */
+  turnRateDegPerMin: number;
+  /** Assumed acceleration, knots per minute. */
+  accelerationKnPerMin: number;
+  /** Assumed deceleration, knots per minute. */
+  decelerationKnPerMin: number;
+  /** Prediction horizon, minutes. */
+  horizonMin: number;
+}
+
+function signedHeadingDifference(target: number, current: number): number {
+  return ((target - current + 540) % 360) - 180;
+}
+
+/**
+ * Dynamic ARPA trial prediction. Target velocity remains the latest ARPA
+ * estimate; own ship continues on present motion during delay, then turns at
+ * the entered ROT and changes speed at the entered acceleration/deceleration.
+ * The real vessel and live ARPA tracks are never mutated.
+ */
+export function calculateDynamicTrialManoeuvre(
+  track: ArpaTrack,
+  target: Pick<VesselState, "xNm" | "yNm">,
+  own: Pick<VesselState, "xNm" | "yNm" | "courseDeg" | "speedKn">,
+  trial: DynamicTrialManoeuvre,
+): ArpaSolution {
+  validateTrial(trial);
+  const values = [trial.delayMin, trial.turnRateDegPerMin, trial.accelerationKnPerMin,
+    trial.decelerationKnPerMin, trial.horizonMin];
+  if (values.some((value) => !Number.isFinite(value) || value < 0) ||
+      trial.turnRateDegPerMin <= 0 || trial.horizonMin <= 0) {
+    throw new RangeError("Dynamic trial delay/rates must be non-negative; ROT and horizon must be positive.");
+  }
+  const east = target.xNm - own.xNm;
+  const north = target.yNm - own.yNm;
+  const rangeNm = Math.hypot(east, north);
+  const bearingDeg = (Math.atan2(east, north) * 180 / Math.PI + 360) % 360;
+  if (track.status !== "tracking" || track.targetVelocityEastKn === null ||
+      track.targetVelocityNorthKn === null) {
+    return { rangeNm, bearingDeg, tcpaMin: null, dcpaNm: null };
+  }
+
+  const targetEastKn = track.targetVelocityEastKn;
+  const targetNorthKn = track.targetVelocityNorthKn;
+  let ownEast = own.xNm;
+  let ownNorth = own.yNm;
+  let heading = own.courseDeg;
+  let speed = own.speedKn;
+  let closestDistance = rangeNm;
+  let closestTimeMin = 0;
+  const stepSeconds = 1;
+  const totalSeconds = Math.ceil(trial.horizonMin * 60);
+  const delaySeconds = trial.delayMin * 60;
+
+  for (let second = 1; second <= totalSeconds; second += stepSeconds) {
+    const previousHeading = heading;
+    const previousSpeed = speed;
+    if (second > delaySeconds) {
+      const headingError = signedHeadingDifference(trial.courseDeg, heading);
+      const maximumTurn = trial.turnRateDegPerMin / 60 * stepSeconds;
+      heading = (heading + Math.sign(headingError) * Math.min(Math.abs(headingError), maximumTurn) + 360) % 360;
+      const speedRate = trial.speedKn >= speed ? trial.accelerationKnPerMin : trial.decelerationKnPerMin;
+      const speedStep = speedRate / 60 * stepSeconds;
+      speed += Math.sign(trial.speedKn - speed) * Math.min(Math.abs(trial.speedKn - speed), speedStep);
+    }
+    const midHeading = (previousHeading + signedHeadingDifference(heading, previousHeading) / 2 + 360) % 360;
+    const midSpeed = (previousSpeed + speed) / 2;
+    const midVelocity = velocityFromCourse(midHeading, midSpeed);
+    ownEast += midVelocity.eastKn * stepSeconds / 3600;
+    ownNorth += midVelocity.northKn * stepSeconds / 3600;
+
+    const hours = second / 3600;
+    const targetEast = target.xNm + targetEastKn * hours;
+    const targetNorth = target.yNm + targetNorthKn * hours;
+    const separation = Math.hypot(targetEast - ownEast, targetNorth - ownNorth);
+    if (separation < closestDistance) {
+      closestDistance = separation;
+      closestTimeMin = second / 60;
+    }
+  }
+  return { rangeNm, bearingDeg, tcpaMin: closestTimeMin, dcpaNm: closestDistance };
+}
