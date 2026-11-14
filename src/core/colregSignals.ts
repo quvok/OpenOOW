@@ -112,6 +112,7 @@ export interface RestrictedVisibilitySignalProfile {
   makingWay: boolean;
   underSailAndPower?: boolean;
   wigOnSurface?: boolean;
+  seaplaneOnWater?: boolean;
   engagedInFishing?: boolean;
 }
 
@@ -135,7 +136,7 @@ export function getRestrictedVisibilitySignal(profile: RestrictedVisibilitySigna
     return { rule: 35, pattern: "1 продолжительный + 2 коротких через интервалы не более 2 минут", meaning: "NUC, RAM, CBD, парусное, рыболовное или буксирующее судно", context: "Правило 35(c); учитывайте дополнительные сигналы буксируемого состава." };
   }
   if (profile.kind === "wig-craft" && !profile.wigOnSurface) return null;
-  if (profile.kind === "other" || profile.kind === "seaplane") return null;
+  if (profile.kind === "other" || profile.kind === "seaplane" && !profile.seaplaneOnWater) return null;
   if (!profile.underway) return null;
   return profile.makingWay
     ? { rule: 35, pattern: "1 продолжительный через интервалы не более 2 минут", meaning: "Механическое судно на ходу и с ходом относительно воды", context: "Правило 35(a)." }
