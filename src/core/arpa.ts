@@ -120,7 +120,7 @@ export function updateArpaTracks(
       targetVelocityNorthKn: velocity?.northKn ?? null,
       estimatedCourseDeg: courseDeg,
       estimatedSpeedKn: speedKn,
-      measurementsUsed: measurements.length,
+      measurementsUsed: nextMeasurements.length,
     };
   }
   return nextTracks;
