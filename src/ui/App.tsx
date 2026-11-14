@@ -87,7 +87,10 @@ export default function App() {
             return {
               ownShip: nextOwnShip,
               targets: nextTargets,
-              tracks: recordRadarTracks(current.tracks, nextTargets, nextOwnShip.elapsedSeconds),
+              tracks: recordRadarTracks(current.tracks, nextTargets, nextOwnShip.elapsedSeconds, 5, 120, {
+                xNm: nextOwnShip.eastNm,
+                yNm: nextOwnShip.northNm,
+              }),
             };
           },
         );
@@ -199,8 +202,12 @@ export default function App() {
             {targets.map((target) => {
               const point = projectRelativePosition(ownVessel, target, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
               const history = tracks[target.id] ?? [];
-              const trailPoints = [...history, { xNm: target.xNm, yNm: target.yNm, timeSeconds: ship.elapsedSeconds }]
-                .map((sample) => projectRelativePosition(ownVessel, sample, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER))
+              const trailPoints = [...history, {
+                xNm: target.xNm - ownVessel.xNm,
+                yNm: target.yNm - ownVessel.yNm,
+                timeSeconds: ship.elapsedSeconds,
+              }]
+                .map((sample) => projectRelativePosition({ xNm: 0, yNm: 0 }, sample, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER))
                 .filter((sample) => Math.hypot(sample.x - RADAR_CENTER, sample.y - RADAR_CENTER) <= RADAR_RADIUS_PX);
               const trailPath = trailPoints.map((sample) => sample.x.toFixed(1) + "," + sample.y.toFixed(1)).join(" ");
               const vector = motionVectorToRadar(ownVessel, target, vectorMode, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX);
