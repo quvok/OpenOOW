@@ -20,7 +20,23 @@ export interface VesselLightGuidance {
   notes: string[];
 }
 
-export interface LightVisibilityMinimums {\n  vesselLengthBand: string;\n  mastheadNm: number;\n  sidelightsNm: number;\n  sternNm: number;\n  towingNm: number;\n  allRoundNm: number;\n}\n\nexport function getLightVisibilityMinimums(lengthM: number): LightVisibilityMinimums {\n  if (!Number.isFinite(lengthM) || lengthM <= 0) throw new RangeError("Vessel length must be finite and greater than zero.");\n  if (lengthM >= 50) return { vesselLengthBand: "50 м и более", mastheadNm: 6, sidelightsNm: 3, sternNm: 3, towingNm: 3, allRoundNm: 3 };\n  if (lengthM >= 12) return { vesselLengthBand: "12–менее 50 м", mastheadNm: 5, sidelightsNm: 2, sternNm: 2, towingNm: 2, allRoundNm: 2 };\n  return { vesselLengthBand: "менее 12 м", mastheadNm: 2, sidelightsNm: 1, sternNm: 2, towingNm: 2, allRoundNm: 2 };\n}\n\nexport interface SoundSignalGuidance {
+export interface LightVisibilityMinimums {
+  vesselLengthBand: string;
+  mastheadNm: number;
+  sidelightsNm: number;
+  sternNm: number;
+  towingNm: number;
+  allRoundNm: number;
+}
+
+export function getLightVisibilityMinimums(lengthM: number): LightVisibilityMinimums {
+  if (!Number.isFinite(lengthM) || lengthM <= 0) throw new RangeError("Vessel length must be finite and greater than zero.");
+  if (lengthM >= 50) return { vesselLengthBand: "50 м и более", mastheadNm: 6, sidelightsNm: 3, sternNm: 3, towingNm: 3, allRoundNm: 3 };
+  if (lengthM >= 12) return { vesselLengthBand: "12–менее 50 м", mastheadNm: 5, sidelightsNm: 2, sternNm: 2, towingNm: 2, allRoundNm: 2 };
+  return { vesselLengthBand: "менее 12 м", mastheadNm: 2, sidelightsNm: 1, sternNm: 2, towingNm: 2, allRoundNm: 2 };
+}
+
+export interface SoundSignalGuidance {
   rule: number;
   pattern: string;
   meaning: string;
@@ -53,14 +69,16 @@ export const SOUND_SIGNALS: SoundSignalGuidance[] = [
   { rule: 34, pattern: "5 или более коротких", meaning: "Сомнение или опасность", context: "Подаётся, когда другое судно не понимает намерений/действий или сомневается в достаточности мер." },
   { rule: 34, pattern: "2 продолжительных + 1 короткий", meaning: "Обгоняю с намерением пройти по правому борту обгоняемого", context: "В узком проходе/фарватере, если обгон безопасен и применимы условия правила 9." },
   { rule: 34, pattern: "2 продолжительных + 2 коротких", meaning: "Обгоняю с намерением пройти по левому борту обгоняемого", context: "В узком проходе/фарватере, если обгон безопасен и применимы условия правила 9." },
-  { rule: 34, pattern: "1 продолжительный", meaning: "Предупреждение при приближении к изгибу канала или участку, где другое судно может быть скрыто", context: "Правило 34(e); судно, находящееся за изгибом или препятствием, должно ответить таким же сигналом." },\n  { rule: 34, pattern: "1 продолжительный + 1 короткий + 1 продолжительный + 1 короткий", meaning: "Согласие на обгон", context: "Ответ обгоняемого судна в узком проходе при согласии на безопасный обгон." },
+  { rule: 34, pattern: "1 продолжительный", meaning: "Предупреждение при приближении к изгибу канала или участку, где другое судно может быть скрыто", context: "Правило 34(e); судно, находящееся за изгибом или препятствием, должно ответить таким же сигналом." },
+  { rule: 34, pattern: "1 продолжительный + 1 короткий + 1 продолжительный + 1 короткий", meaning: "Согласие на обгон", context: "Ответ обгоняемого судна в узком проходе при согласии на безопасный обгон." },
   { rule: 35, pattern: "1 продолжительный через интервалы не более 2 минут", meaning: "Механическое судно на ходу и с ходом относительно воды", context: "Ограниченная видимость." },
   { rule: 35, pattern: "2 продолжительных с интервалом около 2 секунд через интервалы не более 2 минут", meaning: "Механическое судно на ходу, но не имеющее хода относительно воды", context: "Ограниченная видимость." },
   { rule: 35, pattern: "1 продолжительный + 2 коротких через интервалы не более 2 минут", meaning: "NUC, RAM, CBD, парусное, рыболовное, буксирующее или толкающее судно", context: "Ограниченная видимость; предусмотрены дополнительные сигналы для последнего manned tow." },
   { rule: 35, pattern: "1 продолжительный + 3 коротких", meaning: "Последнее судно в буксируемом составе, если на нём есть экипаж", context: "Ограниченная видимость; сигнал следует непосредственно за сигналом буксирующего судна." },
   { rule: 35, pattern: "Эффективный звуковой сигнал через интервалы не более 2 минут", meaning: "Судно длиной менее 12 м", context: "Ограниченная видимость; может не подавать установленные сигналы, но должно подавать иной эффективный звуковой сигнал с требуемым интервалом." },
   { rule: 35, pattern: "Колокол быстрым звоном около 5 секунд через интервалы не более 1 минуты", meaning: "Судно на якоре", context: "Для судов 100 м и более после звона колокола подаётся гонг в кормовой части." },
-  { rule: 35, pattern: "3 коротких", meaning: "Предупреждение приближающегося судна о местоположении и возможности столкновения", context: "Дополнительный сигнал судна на якоре в условиях ограниченной видимости." },\n  { rule: 35, pattern: "Колокол + 3 отчётливых удара до и после быстрого звона", meaning: "Судно на мели", context: "Дополнительный сигнал судна на мели." },
+  { rule: 35, pattern: "3 коротких", meaning: "Предупреждение приближающегося судна о местоположении и возможности столкновения", context: "Дополнительный сигнал судна на якоре в условиях ограниченной видимости." },
+  { rule: 35, pattern: "Колокол + 3 отчётливых удара до и после быстрого звона", meaning: "Судно на мели", context: "Дополнительный сигнал судна на мели." },
   { rule: 36, pattern: "Любой разрешённый эффективный сигнал внимания", meaning: "Привлечь внимание другого судна", context: "Не должен быть принят за сигнал, предусмотренный другими правилами, и не должен мешать другим судам." },
   { rule: 37, pattern: "Сигналы бедствия приложения IV", meaning: "Сообщение о бедствии и необходимости помощи", context: "Использовать только при реальном бедствии; учебный справочник не является разрешением подавать ложный сигнал." },
 ];
