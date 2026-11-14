@@ -2,14 +2,15 @@ import { describe, expect, it } from "vitest";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa } from "../src/core/scenarios";
 
 describe("encounter scenarios", () => {
-  it("provides the five initial COLREG training situations", () => {
-    expect(ENCOUNTER_SCENARIOS.map((scenario) => scenario.id)).toEqual([
+  it("preserves the original situations and adds the COLREG context exercises", () => {
+    expect(ENCOUNTER_SCENARIOS.map((scenario) => scenario.id)).toEqual(expect.arrayContaining([
       "head-on",
       "crossing-give-way",
       "overtaking",
       "restricted-visibility",
       "multiple-targets"
-    ]);
+    ]));
+    expect(ENCOUNTER_SCENARIOS.length).toBeGreaterThan(5);
   });
 
   it("defines a positive collision-risk TCPA for the head-on exercise", () => {
