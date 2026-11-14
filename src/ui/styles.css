@@ -474,3 +474,29 @@ input[type=range]{accent-color:#a6b58b}
 .autopilot-actions>span{color:#7893a0;font:9px 'DM Mono',monospace}
 #rudder:disabled{opacity:.35;cursor:not-allowed}
 @media(max-width:560px){.autopilot-readouts b{font-size:11px}.autopilot-readouts small{font-size:7px}.autopilot-settings{grid-template-columns:1fr}.autopilot-adjust{gap:4px}}
+
+/* Transas-inspired ARPA target information panel */
+.target-information-panel{padding:8px!important;background:linear-gradient(145deg,#263039,#171e24)!important;border:1px solid #52616b!important;box-shadow:inset 0 1px 0 #8796a0,0 3px 12px #0008!important;color:#e2e8eb}
+.target-info-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 3px 8px;border-bottom:1px solid #53616a}
+.target-info-topline h2{font-size:15px!important;letter-spacing:.2px;margin:2px 0 0;color:#f0f2f2}
+.target-source-indicator{font:8px 'DM Mono',monospace;color:#9ecb9b;white-space:nowrap}
+.target-info-controls{display:grid;grid-template-columns:1fr auto;gap:6px;padding:8px 2px;align-items:center}
+.target-info-controls label{display:flex;align-items:center;gap:7px;color:#c4cdd1;font:10px 'DM Mono',monospace}
+.target-info-controls select,.target-info-association{min-width:0;background:linear-gradient(#647985,#26343d 48%,#182229);border:1px solid #71838c;border-radius:4px;color:#f2f4f5;padding:6px 8px;font:600 10px 'DM Mono',monospace}
+.target-info-controls select:disabled{opacity:.55}.target-info-association{cursor:default}.target-filter-label{grid-column:1/-1}.target-filter-label select{flex:1}
+.target-info-titlebar{display:flex;justify-content:space-between;align-items:center;padding:7px 9px;background:linear-gradient(#687e89,#293943 48%,#1a252c);border:1px solid #81939c;border-radius:4px 4px 0 0;color:#f2f5f6;font-weight:700;font-size:12px;text-shadow:0 1px 2px #000}
+.target-info-titlebar small{font:8px 'DM Mono',monospace;color:#d5e0e4}
+.target-info-tabs{display:flex;gap:2px;overflow-x:auto;padding-top:5px;border-bottom:1px solid #667781}
+.target-info-tabs button{flex:0 0 auto;border:1px solid #4b5a62;border-bottom:0;border-radius:4px 4px 0 0;background:linear-gradient(#43535d,#202b32);color:#c4d0d5;padding:6px 9px;font:600 10px 'DM Mono',monospace;cursor:pointer}
+.target-info-tabs button.active{background:#aebbc0;color:#17232a;border-color:#d5e0e3}
+.target-info-table-wrap{overflow:auto;max-width:100%}.target-info-table{width:100%;min-width:580px;border-collapse:collapse;font:9px 'DM Mono',monospace;font-variant-numeric:tabular-nums;background:#1b252b}
+.target-info-table th,.target-info-table td{border:1px solid #59676e;padding:7px 5px;text-align:center;white-space:nowrap}.target-info-table th{background:linear-gradient(#52636c,#29363d);color:#e5ecef;font-weight:700}
+.target-info-table td{color:#e4e9e8}.target-info-table tbody tr{cursor:pointer}.target-info-table tbody tr:hover,.target-info-table tbody tr.selected{background:#394b51}.target-info-table tbody tr.selected td:first-child{color:#ffe18c;font-weight:700}
+.target-info-empty{text-align:center!important;color:#9ba9ad!important;padding:18px!important}.target-info-single{padding:8px 3px}
+.target-info-single-heading{display:flex;align-items:center;gap:8px;padding-bottom:8px;color:#f2f4f5;font:10px 'DM Mono',monospace}.target-info-single-heading b{font-size:14px;color:#ffdb84}.target-info-single-heading span{flex:1;color:#9ecb9b}
+.target-info-single-heading button{background:#3d4b52;border:1px solid #68777e;color:#e6ebed;padding:5px 8px;font:9px 'DM Mono',monospace}
+.target-info-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.target-info-metrics>div{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:3px;padding:7px 6px;background:#10191e;border:1px solid #46545b}
+.target-info-metrics small{font:9px 'DM Mono',monospace;color:#9eafb5}.target-info-metrics b{font:600 12px 'DM Mono',monospace;color:#f0f3ed;text-align:right}
+.target-info-metrics em{grid-column:1/-1;font:8px 'DM Mono',monospace;color:#91a0a5;font-style:normal;text-align:right}
+.target-info-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px;padding:8px 3px 1px;color:#93a3a8;font:7px 'DM Mono',monospace;letter-spacing:.25px}
+@media(max-width:1100px){.target-info-table{min-width:540px}.target-info-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
