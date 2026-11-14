@@ -71,7 +71,7 @@ export default function EcdisModule({ ship, targets }: Props) {
       segmentIndex: activeNavigation.activeLegIndex, alongTrackNm: activeNavigation.alongTrackNm, nearestPoint,
       bearingDeg: bearingDeg(activeNavigation.from, activeNavigation.to) };
   }, [activeNavigation]);
-  const routeAssessment = useMemo(() => assessRoute(route, TRAINING_CHART_AREAS, TRAINING_CHART_HAZARDS, requiredDepthM), [route, requiredDepthM]);
+  const routeAssessment = useMemo(() => assessRoute(route, TRAINING_CHART_AREAS, TRAINING_CHART_HAZARDS, Math.max(requiredDepthM, safetyDepthM)), [route, requiredDepthM, safetyDepthM]);
   const legs = useMemo(() => buildRouteLegs(route), [route]);
   const ownDepth = chartedDepthAt(ownPosition, TRAINING_CHART_AREAS);
   const selectedWaypoint = route.find((point) => point.id === selectedWaypointId) ?? null;
@@ -138,8 +138,9 @@ export default function EcdisModule({ ship, targets }: Props) {
             <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#ecdis-grid)"/>
             {Array.from({ length: 25 }, (_, index) => index - 12).map((east) => <text key={"e"+east} x={CENTER_X + east * SCALE + 3} y="16" className="ecdis-grid-label">{east} E</text>)}
             {Array.from({ length: 18 }, (_, index) => index - 9).map((north) => <text key={"n"+north} x="4" y={CENTER_Y - north * SCALE - 3} className="ecdis-grid-label">{north} N</text>)}
+            {TRAINING_CHART_AREAS.filter((area) => area.kind === "charted").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-charted-water"/><text x={toScreen(0,0).x+10} y={toScreen(0,0).y-12} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · CHARTED</text></g>)}
             {TRAINING_CHART_AREAS.filter((area) => area.kind === "land").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-land"/><polygon points={polygonPoints(area.polygon)} fill="url(#ecdis-land-pattern)"/></g>)}
-            {showDepths && TRAINING_CHART_AREAS.filter((area) => area.kind === "shallow").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-shallow"/><text x={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).x+8} y={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).y-6} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · {area.name}</text></g>)}
+            {showDepths && TRAINING_CHART_AREAS.filter((area) => area.kind === "shallow").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className={area.depthM !== undefined && area.depthM < safetyDepthM ? "ecdis-shallow ecdis-depth-danger" : area.depthM !== undefined && area.depthM < safetyContourM ? "ecdis-shallow ecdis-depth-safety" : "ecdis-shallow"}/><text x={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).x+8} y={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).y-6} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · {area.name}</text></g>)}
             {showHazards && TRAINING_CHART_HAZARDS.map((hazard) => { const point = toScreen(hazard.position.eastNm, hazard.position.northNm); return <g key={hazard.id}><circle cx={point.x} cy={point.y} r={hazard.radiusNm*SCALE} className="ecdis-hazard-zone"/><path d={`M ${point.x-8} ${point.y-8} L ${point.x+8} ${point.y+8} M ${point.x+8} ${point.y-8} L ${point.x-8} ${point.y+8}`} className="ecdis-hazard-mark"/><text x={point.x+12} y={point.y-10} className="ecdis-hazard-label">{hazard.name}</text></g>; })}
             {route.length > 1 && <polyline points={polygonPoints(route)} className="ecdis-route-halo"/>}
             {route.length > 1 && <polyline points={polygonPoints(route)} className="ecdis-route-line"/>}
