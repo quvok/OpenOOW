@@ -474,12 +474,16 @@ export function assessColregEncounter(
     });
   }
 
-  const ownLightBase = getVesselLightGuidance(ownProfile.kind);
-  const targetLightBase = getVesselLightGuidance(targetProfile.kind);
+  const ownLightKind = ownProfile.underSailAndPower ? "power-driven" : ownProfile.kind === "fishing" && !ownProfile.engagedInFishing ? "power-driven" : ownProfile.kind;
+  const targetLightKind = targetProfile.underSailAndPower ? "power-driven" : targetProfile.kind === "fishing" && !targetProfile.engagedInFishing ? "power-driven" : targetProfile.kind;
+  const ownLightBase = getVesselLightGuidance(ownLightKind);
+  const targetLightBase = getVesselLightGuidance(targetLightKind);
   const ownLightGuidance = { ...ownLightBase, lights: [...ownLightBase.lights], dayShapes: [...ownLightBase.dayShapes], notes: [...ownLightBase.notes] };
   const targetLightGuidance = { ...targetLightBase, lights: [...targetLightBase.lights], dayShapes: [...targetLightBase.dayShapes], notes: [...targetLightBase.notes] };
   if (ownProfile.underSailAndPower) ownLightGuidance.dayShapes.push("Чёрный конус вершиной вниз: судно идёт под парусами и одновременно использует механическую установку.");
   if (targetProfile.underSailAndPower) targetLightGuidance.dayShapes.push("Чёрный конус вершиной вниз: судно идёт под парусами и одновременно использует механическую установку.");
+  if ((ownProfile.kind === "nuc" || ownProfile.kind === "ram") && ownProfile.makingWay) ownLightGuidance.notes.push("При движении относительно воды выставляются также соответствующие ходовые огни.");
+  if ((targetProfile.kind === "nuc" || targetProfile.kind === "ram") && targetProfile.makingWay) targetLightGuidance.notes.push("При движении относительно воды выставляются также соответствующие ходовые огни.");
   const limitations = [
     "Классификация геометрическая и зависит от введённых профилей; алгоритм не распознаёт огни, знаки, тип судна или его фактическую операцию автоматически.",
     "CPA/TCPA предполагает постоянство курсов и скоростей. Манёвры, дрейф, ветер, течение, мелководье и гидродинамическое взаимодействие не моделируются.",
