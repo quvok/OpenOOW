@@ -321,6 +321,9 @@ export default function App() {
     const next = { ...arpaTracksRef.current, [targetId]: acquireArpaTarget(measurement, measurement.timeSeconds) };
     arpaTracksRef.current = next;
     setArpaTracks(next);
+    setSelectedRadarTargetId(targetId);
+    setTargetInfoTab(targetId);
+    setSelectedTargetInfoBlock("target-info");
   };
 
   const releaseTarget = (targetId: string) => {
