@@ -43,3 +43,37 @@ describe("encounter scenarios", () => {
     expect(scenario.ruleReference).toContain("19");
   });
 });
+
+
+describe("COLREG scenario presets", () => {
+  it("includes training cases for Rules 9, 10, 12, 18 and 19", () => {
+    const ids = ENCOUNTER_SCENARIOS.map((scenario) => scenario.id);
+    expect(ids).toEqual(expect.arrayContaining([
+      "narrow-channel-rule9",
+      "tss-rule10",
+      "sailing-rule12",
+      "fishing-rule18",
+      "nuc-rule18",
+      "restricted-visibility",
+    ]));
+  });
+
+  it("sets the correct contextual profile for the sailing Rule 12 scenario", () => {
+    const scenario = ENCOUNTER_SCENARIOS.find((item) => item.id === "sailing-rule12")!;
+    expect(scenario.colregContext?.ownProfile?.tack).toBe("port");
+    expect(scenario.colregContext?.targetProfile?.tack).toBe("starboard");
+  });
+
+  it("marks restricted visibility as radar-only and not vessels in sight", () => {
+    const scenario = ENCOUNTER_SCENARIOS.find((item) => item.id === "restricted-visibility")!;
+    expect(scenario.colregContext?.environment?.visibility).toBe("restricted");
+    expect(scenario.colregContext?.environment?.vesselsInSight).toBe(false);
+  });
+
+  it("provides TSS and narrow-channel contextual data", () => {
+    const tss = ENCOUNTER_SCENARIOS.find((item) => item.id === "tss-rule10")!;
+    const channel = ENCOUNTER_SCENARIOS.find((item) => item.id === "narrow-channel-rule9")!;
+    expect(tss.colregContext?.environment?.trafficSeparationScheme).toBe(true);
+    expect(channel.colregContext?.environment?.targetCanOnlyNavigateChannel).toBe(true);
+  });
+});
