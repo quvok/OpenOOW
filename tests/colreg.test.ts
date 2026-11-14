@@ -121,7 +121,8 @@ describe("COLREG context and encounter assessment", () => {
   it("applies Rule 12(c) conservatively when own ship is on port tack and target tack is unknown", () => {
     const result = assessColregEncounter(own(), target(0, 2, 180, 8), {
       ownProfile: { kind: "sailing", tack: "port" },
-      targetProfile: { kind: "sailing", tack: "unknown" },\n      environment: { targetWindwardOfOwn: true },
+      targetProfile: { kind: "sailing", tack: "unknown" },
+      environment: { targetWindwardOfOwn: true },
     });
     expect(result.primaryRule).toBe(12);
     expect(result.responsibility).toBe("give-way");
