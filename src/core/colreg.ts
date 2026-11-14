@@ -46,7 +46,6 @@ export interface ColregEnvironment {
   targetOvertakingNotClear?: boolean;
   bearingHistoryDeg?: number[];
   rangeHistoryNm?: number[];
-  windDirectionKnown?: boolean;
   riskDcpaNm?: number;
 }
 
@@ -123,7 +122,6 @@ const defaultEnvironment: ColregEnvironment = {
   trafficSeparationScheme: false,
   ownCrossingTrafficLane: false,
   ownInshoreTrafficZone: false,
-  windDirectionKnown: false,
   riskDcpaNm: 0.5,
 };
 
@@ -160,10 +158,6 @@ function closingSpeed(own: VesselState, target: VesselState, bearingDeg: number)
 
 function isAbaftBeam(relativeBearing: number): boolean {
   return relativeBearing > 112.5 && relativeBearing < 247.5;
-}
-
-function isForwardSector(relativeBearing: number): boolean {
-  return relativeBearing < 112.5 || relativeBearing > 247.5;
 }
 
 function assessRadarTrend(bearings: number[] | undefined, ranges: number[] | undefined): {
