@@ -102,3 +102,10 @@ ECDIS вынесен в отдельную вкладку. В модуле до�
 Добавлен heading autopilot в блок органов управления мостика: уставка истинного курса, шаговая корректировка ±1°/±10°, синхронизация с текущим курсом, ограничение перекладки руля, регулируемый порог off-course alarm и включение/отключение AUTO. Контур вычисляется на каждом фиксированном шаге симуляции; ручной ползунок руля блокируется в режиме AUTO.
 
 Модель — учебный пропорционально-демпфированный регулятор курса. Она не является моделью конкретного судового автопилота и не выполняет Track Control по маршрутным точкам ECDIS.
+
+
+### ARPA Target Information and Dynamic Trial Manoeuvre (v0.23.0)
+
+The Targets Information panel now has a drop-down navigation menu for target overview, CPA/TCPA, BCR/BCT, past positions, ARPA tracking status, and Trial Manoeuvre. AIS is explicitly marked unavailable until an AIS source is implemented.
+
+Trial Manoeuvre now uses a time-stepped prediction: own ship follows its present motion during a configurable delay, then turns at a configured ROT and changes speed using separate acceleration/deceleration rates. Tracked targets continue on their latest ARPA-estimated velocities, and live target tracking is not interrupted. Trial output is predictive only and does not alter actual vessel state. See [ARPA Target Panel documentation](docs/ARPA_TARGET_PANEL.md).
