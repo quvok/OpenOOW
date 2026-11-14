@@ -26,9 +26,9 @@ export interface RadarScanClock {
 export const DEFAULT_RADAR_CONFIG: RadarMeasurementConfig = {
   scanIntervalSeconds: 2.5,
   maximumRangeNm: 3,
-  rangeErrorNm: 0.01,
-  bearingErrorDeg: 0.2,
-  dropoutEveryScans: 17,
+  rangeErrorNm: 0,
+  bearingErrorDeg: 0,
+  dropoutEveryScans: 0,
 };
 
 function validateConfig(config: RadarMeasurementConfig) {
