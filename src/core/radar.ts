@@ -47,3 +47,29 @@ export function courseVectorToRadar(
     dy: -(velocity.northKn * hours / rangeNm) * radiusPx,
   };
 }
+
+export type RadarVectorMode = "true" | "relative";
+
+/** Returns a target vector in true or own-ship-relative motion mode. */
+export function motionVectorToRadar(
+  own: Pick<VesselState, "courseDeg" | "speedKn">,
+  target: Pick<VesselState, "courseDeg" | "speedKn">,
+  mode: RadarVectorMode,
+  vectorMinutes: number,
+  rangeNm: number,
+  radiusPx: number,
+): RadarVector {
+  const targetVelocity = velocityFromCourse(target.courseDeg, target.speedKn);
+  const ownVelocity = velocityFromCourse(own.courseDeg, own.speedKn);
+  const relative = mode === "relative";
+  const eastKn = targetVelocity.eastKn - (relative ? ownVelocity.eastKn : 0);
+  const northKn = targetVelocity.northKn - (relative ? ownVelocity.northKn : 0);
+  if (![vectorMinutes, rangeNm, radiusPx].every(Number.isFinite) || vectorMinutes < 0 || rangeNm <= 0 || radiusPx <= 0) {
+    throw new RangeError("Radar vector inputs must be finite; vector time must be non-negative and range/radius positive.");
+  }
+  const hours = vectorMinutes / 60;
+  return {
+    dx: (eastKn * hours / rangeNm) * radiusPx,
+    dy: -(northKn * hours / rangeNm) * radiusPx,
+  };
+}
