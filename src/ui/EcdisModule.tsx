@@ -135,8 +135,7 @@ export default function EcdisModule({ ship, targets }: Props) {
       const geo = toGeographicPosition(point, origin);
       const safeName = point.name.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("\'", "&apos;");
       return `    <rtept lat="${geo.latitudeDeg.toFixed(7)}" lon="${geo.longitudeDeg.toFixed(7)}"><name>${safeName}</name></rtept>`;
-    }).join("
-");
+    }).join("\n");
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="OpenOOW" xmlns="http://www.topografix.com/GPX/1/1"><rte><name>OpenOOW route</name>
 ${points}
