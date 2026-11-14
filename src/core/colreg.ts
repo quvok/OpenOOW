@@ -188,7 +188,7 @@ function assessRadarTrend(bearings: number[] | undefined, ranges: number[] | und
 
 function normalizeProfile(profile: Partial<ColregVesselProfile> | undefined): ColregVesselProfile {
   const normalized = { ...defaultProfile, ...profile };
-  if (normalized.kind === "anchored" || normalized.kind === "aground") {
+  if (normalized.lengthM !== undefined && (!Number.isFinite(normalized.lengthM) || normalized.lengthM <= 0)) {\n    throw new RangeError("Vessel length must be finite and greater than zero.");\n  }\n  if (normalized.kind === "anchored" || normalized.kind === "aground") {
     normalized.underway = false;
     normalized.makingWay = false;
   }
@@ -196,7 +196,7 @@ function normalizeProfile(profile: Partial<ColregVesselProfile> | undefined): Co
 }
 
 function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironment {
-  const environment = { ...defaultEnvironment, ...options.environment };
+  const environment = { ...defaultEnvironment, ...options.environment, riskDcpaNm: options.environment?.riskDcpaNm ?? options.riskDcpaNm ?? defaultEnvironment.riskDcpaNm };
   if (options.restrictedVisibility !== undefined && options.environment?.visibility === undefined) {
     environment.visibility = options.restrictedVisibility ? "restricted" : "good";
   }
@@ -285,11 +285,12 @@ export function assessColregEncounter(
   const closing = closingSpeed(own, target, bearing);
   const cpa = calculateCpa(own, target);
   const riskLimit = environment.riskDcpaNm ?? 0.5;
-  const collisionRisk: ColregAssessment["collisionRisk"] = !cpa || cpa.tcpaMin <= 0
+  const cpaRisk: ColregAssessment["collisionRisk"] = !cpa || cpa.tcpaMin <= 0
     ? "undetermined"
     : cpa.dcpaNm <= riskLimit ? "risk" : "no-immediate-risk";
   const radarTrend = assessRadarTrend(environment.bearingHistoryDeg, environment.rangeHistoryNm);
-  const hasRisk = collisionRisk === "risk" || radarTrend.rule7RiskIndication;
+  const collisionRisk: ColregAssessment["collisionRisk"] = radarTrend.rule7RiskIndication ? "risk" : cpaRisk;
+  const hasRisk = collisionRisk === "risk";
 
   const applicableRules = [...generalDuties];
   let encounter: EncounterType = "uncertain";
