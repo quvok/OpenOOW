@@ -30,6 +30,16 @@ function polygonPoints(points: Array<{ eastNm: number; northNm: number }>) {
   }).join(" ");
 }
 
+function polygonPath(outer: Array<{ eastNm: number; northNm: number }>, holes: Array<Array<{ eastNm: number; northNm: number }>> = []) {
+  return [outer, ...holes].map((ring) => {
+    const points = ring.map((point) => {
+      const screen = toScreen(point.eastNm, point.northNm);
+      return screen.x + " " + screen.y;
+    });
+    return points.length ? "M " + points.join(" L ") + " Z" : "";
+  }).filter(Boolean).join(" ");
+}
+
 function makeWaypoint(index: number, eastNm: number, northNm: number): RouteWaypoint {
   return { id: "WP-" + String(index).padStart(2, "0"), name: "WP " + String(index).padStart(2, "0"), eastNm, northNm };
 }
@@ -240,9 +250,9 @@ ${points}
             <rect x="-10000" y="-10000" width="20000" height="20000" fill="url(#ecdis-grid)"/>
             {Array.from({ length: 25 }, (_, index) => index - 12).map((east) => <text key={"e"+east} x={CENTER_X + east * SCALE + 3} y="16" className="ecdis-grid-label">{east} E</text>)}
             {Array.from({ length: 18 }, (_, index) => index - 9).map((north) => <text key={"n"+north} x="4" y={CENTER_Y - north * SCALE - 3} className="ecdis-grid-label">{north} N</text>)}
-            {chartAreas.filter((area) => area.kind === "charted").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-charted-water"/><text x={toScreen(0,0).x+10} y={toScreen(0,0).y-12} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · CHARTED</text></g>)}
-            {chartAreas.filter((area) => area.kind === "land").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className="ecdis-land"/><polygon points={polygonPoints(area.polygon)} fill="url(#ecdis-land-pattern)"/></g>)}
-            {showDepths && chartAreas.filter((area) => area.kind === "shallow").map((area) => <g key={area.id}><polygon points={polygonPoints(area.polygon)} className={area.depthM !== undefined && area.depthM < safetyDepthM ? "ecdis-shallow ecdis-depth-danger" : area.depthM !== undefined && area.depthM < safetyContourM ? "ecdis-shallow ecdis-depth-safety" : "ecdis-shallow"}/><text x={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).x+8} y={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).y-6} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · {area.name}</text></g>)}
+            {chartAreas.filter((area) => area.kind === "charted").map((area) => <g key={area.id}><path d={polygonPath(area.polygon, area.holes)} fillRule="evenodd" className="ecdis-charted-water"/><text x={toScreen(0,0).x+10} y={toScreen(0,0).y-12} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · CHARTED</text></g>)}
+            {chartAreas.filter((area) => area.kind === "land").map((area) => <g key={area.id}><path d={polygonPath(area.polygon, area.holes)} fillRule="evenodd" className="ecdis-land"/><path d={polygonPath(area.polygon, area.holes)} fill="url(#ecdis-land-pattern)" fillRule="evenodd"/></g>)}
+            {showDepths && chartAreas.filter((area) => area.kind === "shallow").map((area) => <g key={area.id}><path d={polygonPath(area.polygon, area.holes)} fillRule="evenodd" className={area.depthM !== undefined && area.depthM < safetyDepthM ? "ecdis-shallow ecdis-depth-danger" : area.depthM !== undefined && area.depthM < safetyContourM ? "ecdis-shallow ecdis-depth-safety" : "ecdis-shallow"}/><text x={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).x+8} y={toScreen(area.polygon[0].eastNm, area.polygon[0].northNm).y-6} className="ecdis-depth-label">{area.depthM?.toFixed(1)} m · {area.name}</text></g>)}
             {showDepths && importedChart?.contours.map((contour) => <polyline key={contour.id} points={polygonPoints(contour.points)} className="ecdis-imported-contour"><title>{contour.depthM.toFixed(1)} m</title></polyline>)}\n            {showDepths && importedChart?.soundings.map((sounding) => { const p=toScreen(sounding.position.eastNm,sounding.position.northNm); return <g key={sounding.id} className="ecdis-imported-sounding"><circle cx={p.x} cy={p.y} r="2"/><text x={p.x+4} y={p.y-3}>{sounding.depthM.toFixed(1)}</text></g>; })}\n            {showHazards && chartHazards.map((hazard) => { const point = toScreen(hazard.position.eastNm, hazard.position.northNm); return <g key={hazard.id}><circle cx={point.x} cy={point.y} r={hazard.radiusNm*SCALE} className="ecdis-hazard-zone"/><path d={`M ${point.x-8} ${point.y-8} L ${point.x+8} ${point.y+8} M ${point.x+8} ${point.y-8} L ${point.x-8} ${point.y+8}`} className="ecdis-hazard-mark"/><text x={point.x+12} y={point.y-10} className="ecdis-hazard-label">{hazard.name}</text></g>; })}
             {monitoringRoute.length > 1 && <polyline points={polygonPoints(monitoringRoute)} className="ecdis-route-halo"/>}
             {monitoringRoute.length > 1 && <polyline points={polygonPoints(monitoringRoute)} className="ecdis-route-line"/>}
