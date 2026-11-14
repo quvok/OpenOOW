@@ -188,3 +188,5 @@ input[type=range]{accent-color:#a6b58b}
   .instrument-footer{gap:10px;overflow-x:auto;white-space:nowrap}
   .cpa-table{min-width:430px}
 }
+
+.radar-view .range-labels{display:initial}
