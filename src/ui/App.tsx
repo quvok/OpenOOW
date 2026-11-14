@@ -246,7 +246,7 @@ export default function App() {
       </section>
       <div className="main-grid">
         <section className="panel radar-panel">
-          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · VECTOR 6 MIN</span></div>
+          <div className="panel-heading"><div><span className="eyebrow">СИТУАЦИОННАЯ КАРТИНА</span><h2>Положение судов</h2></div><span className="unit">NORTH UP · 3 NM · SCAN 2.5 S · VECTOR 6 MIN</span></div>
           <div className="vector-mode-control"><span>ВЕКТОРЫ ЦЕЛЕЙ</span><div><button type="button" className={vectorMode === "true" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("true")}>Истинные</button><button type="button" className={vectorMode === "relative" ? "mode-active" : "mode-button"} onClick={() => setVectorMode("relative")}>Относительные</button></div></div>
           <svg className="radar-view" viewBox="0 0 500 500" role="img" aria-label="Схема взаимного положения судов">
             <circle cx="250" cy="250" r="235" className="radar-bg"/>
