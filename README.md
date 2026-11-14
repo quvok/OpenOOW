@@ -69,6 +69,7 @@
 
 - [Техническая спецификация 1.0](docs/TECHNICAL_SPECIFICATION.md)
 - [Архитектура и границы модулей](docs/ARCHITECTURE.md)
+- [Основа учебной оценки МППСС-72](docs/COLREG_MODULE.md)
 
 ## Запуск локально
 
