@@ -210,7 +210,8 @@ describe("COLREG context and encounter assessment", () => {
     expect(getLightVisibilityMinimums(8).sidelightsNm).toBe(1);
     expect(() => getLightVisibilityMinimums(0)).toThrow(RangeError);
   });
-\n
+
+
   it("rejects malformed radar history and vessel dimensions", () => {
     expect(() => assessColregEncounter(own(), target(1, 1), {
       environment: { bearingHistoryDeg: [45, Number.NaN, 45], rangeHistoryNm: [2, 1.9, 1.8] },
@@ -224,7 +225,8 @@ describe("COLREG context and encounter assessment", () => {
     const result = assessColregEncounter(own(), target(1, 1, 270, 10), { riskDcpaNm: 0 });
     expect(result.collisionRisk).toBe("risk");
   });
-\n  it("rejects invalid or coincident vessel states", () => {
+
+  it("rejects invalid or coincident vessel states", () => {
     expect(() => assessColregEncounter(own(), target(0, 0))).toThrow(RangeError);
     expect(() => assessColregEncounter(own(), target(1, 1, 0, -1))).toThrow(RangeError);
     expect(() => assessColregEncounter(own(), target(1, 1), { environment: { riskDcpaNm: -1 } })).toThrow(RangeError);
