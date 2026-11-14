@@ -38,6 +38,14 @@ describe("radar track history", () => {
     expect(next.T2).toHaveLength(1);
   });
 
+  it("stores each sample relative to own ship at that exact time", () => {
+    const initial = createRadarTrackHistory([target], 0, { xNm: 0.5, yNm: 1 });
+    expect(initial.T1[0]).toMatchObject({ xNm: 0.5, yNm: 1 });
+    const movedTarget = { ...target, xNm: 1.5, yNm: 2.5 };
+    const next = recordRadarTracks(initial, [movedTarget], 5, 5, 120, { xNm: 1, yNm: 2 });
+    expect(next.T1[1]).toMatchObject({ xNm: 0.5, yNm: 0.5 });
+  });
+
   it("rejects invalid sampling settings", () => {
     const history = createRadarTrackHistory([target]);
     expect(() => recordRadarTracks(history, [target], 5, 0)).toThrow(RangeError);
