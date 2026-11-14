@@ -188,7 +188,8 @@ function assessRadarTrend(bearings: number[] | undefined, ranges: number[] | und
 
 function normalizeProfile(profile: Partial<ColregVesselProfile> | undefined): ColregVesselProfile {
   const normalized = { ...defaultProfile, ...profile };
-  if (normalized.lengthM !== undefined && (!Number.isFinite(normalized.lengthM) || normalized.lengthM <= 0)) {\n    throw new RangeError("Vessel length must be finite and greater than zero.");\n  }\n  if (normalized.kind === "anchored" || normalized.kind === "aground") {
+  if (normalized.lengthM !== undefined && (!Number.isFinite(normalized.lengthM) || normalized.lengthM <= 0)) {
+    throw new RangeError("Vessel length must be finite and greater than zero.");\n  }\n  if (normalized.kind === "anchored" || normalized.kind === "aground") {
     normalized.underway = false;
     normalized.makingWay = false;
   }
