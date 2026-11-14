@@ -293,7 +293,7 @@ export function assessColregEncounter(
   const collisionRisk: ColregAssessment["collisionRisk"] = radarTrend.rule7RiskIndication ? "risk" : cpaRisk;
   const hasRisk = collisionRisk === "risk";
 
-  const applicableRules = [...generalDuties];
+  const applicableRules = generalDuties.map((item) => item.rule === 7 && radarTrend.rule7RiskIndication\n    ? { ...item, duty: "Постоянный пеленг при уменьшающейся дистанции по последним радиолокационным измерениям указывает на возможную опасность. Не полагайтесь на один признак: продолжайте систематическую прокладку и оценку всеми доступными средствами." }\n    : item);
   let encounter: EncounterType = "uncertain";
   let primaryRule: number | null = null;
   let title = "Ситуация не классифицирована";
