@@ -40,6 +40,8 @@ export default function App() {
   const [activeScenario, setActiveScenario] = useState<EncounterScenario>(ENCOUNTER_SCENARIOS[0]);
   const [ship, setShip] = useState<ShipDynamicsState>(() => createScenarioShipState(ENCOUNTER_SCENARIOS[0]));
   const [running, setRunning] = useState(false);
+  const [eblBearingDeg, setEblBearingDeg] = useState(0);
+  const [vrmRangeNm, setVrmRangeNm] = useState(1.5);
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
@@ -120,6 +122,10 @@ export default function App() {
 
   const x = 250 + (ship.eastNm / RADAR_RANGE_NM) * 220;
   const y = 250 - (ship.northNm / RADAR_RANGE_NM) * 220;
+  const eblRadians = eblBearingDeg * Math.PI / 180;
+  const eblX = x + Math.sin(eblRadians) * 220;
+  const eblY = y - Math.cos(eblRadians) * 220;
+  const vrmRadiusPx = (vrmRangeNm / RADAR_RANGE_NM) * 220;
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
 
@@ -165,6 +171,9 @@ export default function App() {
             }
             <path d="M250 15V485 M15 250H485" className="radar-cross"/>
             <path d={"M250 250 L" + x + " " + y} className="track-line"/>
+            <circle cx={x} cy={y} r={vrmRadiusPx} className="vrm-ring"/>
+            <path d={"M" + x + " " + y + " L" + eblX + " " + eblY} className="ebl-line"/>
+            <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
             {targets.map((target) => {
               const tx = 250 + (target.xNm / RADAR_RANGE_NM) * 220;
               const ty = 250 - (target.yNm / RADAR_RANGE_NM) * 220;
@@ -178,6 +187,10 @@ export default function App() {
             <text x="260" y="28">N</text><text x="260" y="270">OWN SHIP</text>
           </svg>
           <div className="radar-legend"><span><i className="dot own-dot"/>Собственное судно</span><span><i className="dot target-dot"/>Цели</span><span>Шкала: 3 NM</span></div>
+          <div className="radar-tools">
+            <div className="radar-tool"><div className="control-title"><label htmlFor="ebl-bearing">EBL · Истинный пеленг</label><strong>{eblBearingDeg.toFixed(0)}° T</strong></div><input id="ebl-bearing" type="range" min="0" max="359" step="1" value={eblBearingDeg} onChange={(event) => setEblBearingDeg(Number(event.target.value))}/><div className="range-labels"><span>000°</span><span>359°</span></div></div>
+            <div className="radar-tool"><div className="control-title"><label htmlFor="vrm-range">VRM · Дистанция</label><strong>{vrmRangeNm.toFixed(1)} NM</strong></div><input id="vrm-range" type="range" min="0.1" max="3" step="0.1" value={vrmRangeNm} onChange={(event) => setVrmRangeNm(Number(event.target.value))}/><div className="range-labels"><span>0.1 NM</span><span>3.0 NM</span></div></div>
+          </div>
         </section>
         <div className="control-column">
           <section className="panel">
