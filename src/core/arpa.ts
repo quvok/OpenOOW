@@ -1,4 +1,5 @@
 import type { VesselState } from "./navigation";
+import type { RadarMeasurement } from "./radarMeasurements";
 import { velocityFromCourse } from "./navigation";
 
 export interface ArpaMeasurement {
@@ -32,7 +33,7 @@ function validateTime(timeSeconds: number) {
 }
 
 /** Starts manual acquisition from the contact's current measured position. */
-export function acquireArpaTarget(target: VesselState, timeSeconds: number): ArpaTrack {
+export function acquireArpaTarget(target: Pick<RadarMeasurement, "id" | "xNm" | "yNm">, timeSeconds: number): ArpaTrack {
   validateTime(timeSeconds);
   return {
     targetId: target.id,
@@ -71,26 +72,24 @@ function estimateVelocity(samples: readonly ArpaMeasurement[]) {
 }
 
 /**
- * Updates acquired tracks from position measurements. Measurements are sampled
- * at a fixed interval; target truth course/speed are never read by the tracker.
+ * Updates acquired tracks only from completed radar-sweep measurements.
+ * Scenario truth course/speed are never read by the tracker.
  */
 export function updateArpaTracks(
   tracks: ArpaTrackSet,
-  targets: readonly VesselState[],
+  measurements: readonly Pick<RadarMeasurement, "id" | "xNm" | "yNm">[],
   timeSeconds: number,
-  sampleIntervalSeconds = 5,
-  lostAfterSeconds = 15,
+  lostAfterSeconds = 10,
 ): ArpaTrackSet {
   validateTime(timeSeconds);
-  if (!Number.isFinite(sampleIntervalSeconds) || sampleIntervalSeconds <= 0 ||
-      !Number.isFinite(lostAfterSeconds) || lostAfterSeconds <= sampleIntervalSeconds) {
-    throw new RangeError("ARPA sample interval must be positive and lost timeout must exceed it.");
+  if (!Number.isFinite(lostAfterSeconds) || lostAfterSeconds <= 0) {
+    throw new RangeError("ARPA lost timeout must be positive.");
   }
 
   let nextTracks = tracks;
   for (const [id, track] of Object.entries(tracks)) {
     if (track.status === "lost") continue;
-    const target = targets.find((item) => item.id === id);
+    const target = measurements.find((item) => item.id === id);
     if (!target) {
       if (timeSeconds - track.lastMeasurementSeconds > lostAfterSeconds) {
         if (nextTracks === tracks) nextTracks = { ...tracks };
@@ -98,7 +97,7 @@ export function updateArpaTracks(
       }
       continue;
     }
-    if (timeSeconds - track.lastMeasurementSeconds < sampleIntervalSeconds - 1e-9) continue;
+    if (timeSeconds <= track.lastMeasurementSeconds + 1e-9) continue;
 
     const measurements = [...track.measurements, {
       xNm: target.xNm,
