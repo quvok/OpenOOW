@@ -101,6 +101,16 @@ describe("COLREG context and encounter assessment", () => {
     expect(result.responsibility).toBe("stand-on");
   });
 
+
+  it("gives Rule 13 precedence over Rule 12 when one sailing vessel overtakes another", () => {
+    const result = assessColregEncounter(own(0, 10), target(0, 2, 0, 6), {
+      ownProfile: { kind: "sailing", tack: "port" },
+      targetProfile: { kind: "sailing", tack: "starboard" },
+    });
+    expect(result.primaryRule).toBe(13);
+    expect(result.responsibility).toBe("give-way");
+  });
+
   it("uses Rule 12 for sailing vessels on different tacks", () => {
     const result = assessColregEncounter(own(), target(0, 2, 180, 8), {
       ownProfile: { kind: "sailing", tack: "port" },
