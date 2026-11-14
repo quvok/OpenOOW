@@ -274,7 +274,7 @@ export function assessColregEncounter(
       duty: "Держитесь ближе к правой внешней границе фарватера, насколько это безопасно и практически возможно. Не затрудняйте проход судну, которое может безопасно идти только в пределах канала; пересекайте канал только если не создаёте помех.",
       status: "applies",
     });
-    if (target && (ownProfile.lengthM ?? 50) < 20 || ownProfile.kind === "sailing" ||
+    if ((ownProfile.lengthM ?? 50) < 20 || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) ||
         (ownProfile.kind === "fishing" && ownProfile.engagedInFishing)) {
       if (environment.targetCanOnlyNavigateChannel) {
         addDuty(applicableRules, {
@@ -301,7 +301,7 @@ export function assessColregEncounter(
         status: "conditional",
       });
     }
-    if (environment.targetFollowingTrafficLane && (ownProfile.kind === "fishing" && ownProfile.engagedInFishing || ownProfile.kind === "sailing" || (ownProfile.lengthM ?? 50) < 20)) {\n      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });\n    }\n    if (environment.ownInshoreTrafficZone) {
+    if (environment.targetFollowingTrafficLane && ((ownProfile.kind === "fishing" && ownProfile.engagedInFishing) || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) || (ownProfile.lengthM ?? 50) < 20)) {\n      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });\n    }\n    if (environment.ownInshoreTrafficZone) {
       addDuty(applicableRules, {
         rule: 10,
         title: "Прибрежная зона движения",
@@ -356,8 +356,8 @@ export function assessColregEncounter(
       }
       applicableRules.push({ rule: 12, title: "Парусные суда", duty: ownShipDuty, status: "applies" });
     } else {
-      const ownOvertaking = isAbaftBeam(targetRelativeBearing) && closing > 0.05;
-      const targetOvertaking = isAbaftBeam(ownRelativeBearing) && closing > 0.05;
+      const ownOvertaking = ownProfile.underway && targetProfile.underway && isAbaftBeam(targetRelativeBearing) && closing > 0.05;
+      const targetOvertaking = ownProfile.underway && targetProfile.underway && isAbaftBeam(ownRelativeBearing) && closing > 0.05;
       if (ownOvertaking) {
         encounter = "overtaking-own";
         primaryRule = 13;
