@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Anchor, AlertTriangle, Crosshair, Map, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useMemo, useState, type MouseEvent } from "react";
+import { Anchor, Map, RotateCcw, Trash2 } from "lucide-react";
 import type { ShipDynamicsState } from "../core/shipDynamics";
 import type { VesselState } from "../core/navigation";
 import {
@@ -61,7 +61,7 @@ export default function EcdisModule({ ship, targets }: Props) {
   const geoOwn = toGeographicPosition(ownPosition, origin);
   const mapTransform = "translate(" + CENTER_X + " " + CENTER_Y + ") scale(" + chartScale + ") translate(" + -CENTER_X + " " + -CENTER_Y + ")";
 
-  const addWaypoint = (event: React.MouseEvent<SVGSVGElement>) => {
+  const addWaypoint = (event: MouseEvent<SVGSVGElement>) => {
     if (!routeEdit) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const px = (event.clientX - rect.left) * WIDTH / rect.width;
