@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Anchor, Map, RotateCcw, Trash2 } from "lucide-react";
 import type { ShipDynamicsState } from "../core/shipDynamics";
 import type { VesselState } from "../core/navigation";
@@ -44,7 +44,7 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [showHazards, setShowHazards] = useState(true);
   const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(null);
   const [routeEdit, setRouteEdit] = useState(true);
-  const [chartScale, setChartScale] = useState(1);
+  const [chartScale, setChartScale] = useState(1);\n  const [activeLegIndex, setActiveLegIndex] = useState(0);\n  const [arrivalRadiusNm, setArrivalRadiusNm] = useState(0.05);\n  const [safetyDepthM, setSafetyDepthM] = useState(8);\n  const [safetyContourM, setSafetyContourM] = useState(10);\n  const [shallowContourM, setShallowContourM] = useState(20);\n  const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);
   const [statusMessage, setStatusMessage] = useState("Нажмите на карту, чтобы добавить первую маршрутную точку.");
   const ownPosition = { eastNm: ship.eastNm, northNm: ship.northNm };
   const requiredDepthM = draftM + ukcM;
@@ -69,6 +69,7 @@ export default function EcdisModule({ ship, targets }: Props) {
     const eastNm = ship.eastNm + (px - CENTER_X) / (SCALE * chartScale);
     const northNm = ship.northNm + (CENTER_Y - py) / (SCALE * chartScale);
     setRoute((current) => [...current, makeWaypoint(current.length + 1, Number(eastNm.toFixed(3)), Number(northNm.toFixed(3)))]);
+    setActiveLegIndex(0);
     setStatusMessage("Маршрутная точка добавлена. Продолжайте прокладку или отключите режим редактирования.");
   };
 
@@ -155,27 +156,39 @@ export default function EcdisModule({ ship, targets }: Props) {
           <div className="ecdis-readout-grid">
             <div><small>XTE</small><b className={crossTrack && crossTrack.distanceNm>xtdNm ? "ecdis-alarm-text" : ""}>{crossTrack ? crossTrack.distanceNm.toFixed(3)+" NM" : "—"}</b></div>
             <div><small>XTD LIMIT</small><b>{xtdNm.toFixed(2)} NM</b></div>
-            <div><small>BEARING TO WP</small><b>{bearingToNext === null ? "—" : bearingToNext.toFixed(1)+"° T"}</b></div>
+            <div><small>ACTIVE LEG</small><b>{activeNavigation ? `${activeNavigation.from.name} → ${activeNavigation.to.name}` : "—"}</b></div>\n            <div><small>BEARING TO WP</small><b>{bearingToNext === null ? "—" : bearingToNext.toFixed(1)+"° T"}</b></div>
             <div><small>DISTANCE TO WP</small><b>{distanceToNext === null ? "—" : distanceToNext.toFixed(2)+" NM"}</b></div>
             <div><small>ROUTE LENGTH</small><b>{routeAssessment.totalDistanceNm.toFixed(2)} NM</b></div>
-            <div><small>ETA AT CURRENT SOG</small><b>{etaMinutes === null ? "—" : Math.round(etaMinutes)+" min"}</b></div>
+            <div><small>ETA AT CURRENT SOG</small><b>{etaMinutes === null ? "—" : Math.round(etaMinutes)+" min"}</b></div>\n            <div><small>ARRIVAL RADIUS</small><b>{arrivalRadiusNm.toFixed(2)} NM</b></div>
           </div>
           <label className="ecdis-setting"><span>Допуск XTD, NM</span><input type="number" min="0.05" max="5" step="0.05" value={xtdNm} onChange={(event)=>setXtdNm(Math.max(0.05,Math.min(5,Number(event.target.value)||0.05)))}/></label>
+          <label className="ecdis-setting"><span>Радиус прибытия WP, NM</span><input type="number" min="0.01" max="0.5" step="0.01" value={arrivalRadiusNm} onChange={(event)=>setArrivalRadiusNm(Math.max(0.01,Math.min(0.5,Number(event.target.value)||0.05)))}/></label>
           <label className="ecdis-setting"><span>Осадка судна, м</span><input type="number" min="0.5" max="30" step="0.1" value={draftM} onChange={(event)=>setDraftM(Math.max(0.5,Math.min(30,Number(event.target.value)||0.5)))}/></label>
           <label className="ecdis-setting"><span>Запас под килем, м</span><input type="number" min="0" max="20" step="0.1" value={ukcM} onChange={(event)=>setUkcM(Math.max(0,Math.min(20,Number(event.target.value)||0)))}/></label>
+          <label className="ecdis-setting"><span>Safety depth, м</span><input type="number" min="0" max="100" step="0.5" value={safetyDepthM} onChange={(event)=>setSafetyDepthM(Math.max(0,Math.min(100,Number(event.target.value)||0)))}/></label>
+          <label className="ecdis-setting"><span>Safety contour, м</span><input type="number" min="0" max="100" step="0.5" value={safetyContourM} onChange={(event)=>setSafetyContourM(Math.max(safetyDepthM,Math.min(100,Number(event.target.value)||safetyDepthM)))}/></label>
+          <label className="ecdis-setting"><span>Shallow contour, м</span><input type="number" min="0" max="200" step="0.5" value={shallowContourM} onChange={(event)=>setShallowContourM(Math.max(safetyContourM,Math.min(200,Number(event.target.value)||safetyContourM)))}/></label>
+          <label className="ecdis-setting"><span>Плановый ROT, °/мин</span><input type="number" min="1" max="60" step="1" value={plannedRotDegPerMin} onChange={(event)=>setPlannedRotDegPerMin(Math.max(1,Math.min(60,Number(event.target.value)||1)))}/></label>
         </section>
         <section className="ecdis-data-block">
           <div className="ecdis-block-heading"><span>ROUTE PLAN</span><b>ПЛАНИРОВАНИЕ</b></div>
           <div className="ecdis-route-actions"><button type="button" className="ecdis-tool" onClick={removeLastWaypoint} disabled={!route.length}><Trash2 size={13}/> УДАЛИТЬ ПОСЛЕДНЮЮ</button><button type="button" className="ecdis-tool" onClick={clearRoute} disabled={!route.length}><RotateCcw size={13}/> ОЧИСТИТЬ</button></div>
           <div className="ecdis-waypoint-list">{route.length ? route.map((point,index)=>{const geo=toGeographicPosition(point,origin);return <button type="button" key={point.id} className={selectedWaypointId===point.id?"ecdis-waypoint-row selected":"ecdis-waypoint-row"} onClick={()=>setSelectedWaypointId(point.id)}><b>{index+1}. {point.name}</b><span>{point.eastNm.toFixed(2)} E / {point.northNm.toFixed(2)} N NM</span><small>{formatCoordinate(geo.latitudeDeg,true)} · {formatCoordinate(geo.longitudeDeg,false)}</small></button>;}) : <p>Маршрут пока не задан. Включите прокладку и добавьте точки на карте.</p>}</div>
           {selectedWaypoint && <div className="ecdis-selected-waypoint"><b>{selectedWaypoint.name}</b><span>{selectedWaypoint.eastNm.toFixed(3)} E / {selectedWaypoint.northNm.toFixed(3)} N NM</span></div>}
+          {route.length > 2 && <div className="ecdis-selected-waypoint"><b>WHEEL-OVER ESTIMATE</b><span>ROT {plannedRotDegPerMin.toFixed(0)}°/min · based on current SOG {ship.speedKn.toFixed(1)} kn</span>{route.slice(1, -1).map((point, index) => {
+            const incoming = bearingDeg(route[index], point);
+            const outgoing = bearingDeg(point, route[index + 2]);
+            const delta = ((outgoing - incoming + 540) % 360) - 180;
+            const wheelOver = calculateWheelOverDistanceNm(ship.speedKn, plannedRotDegPerMin, delta);
+            return <small key={point.id}>{point.name}: {wheelOver === null ? "—" : wheelOver.toFixed(3) + " NM before WP"} · ΔC {Math.abs(delta).toFixed(0)}°</small>;
+          })}</div>}
         </section>
         <section className="ecdis-data-block">
           <div className="ecdis-block-heading"><span>SAFETY CHECK</span><b>ПРОВЕРКА БЕЗОПАСНОСТИ</b></div>
-          <div className={routeAssessment.safe ? "ecdis-safety-box safe" : "ecdis-safety-box danger"}>
+          <div className={routeAssessment.safe && requiredDepthM >= safetyDepthM ? "ecdis-safety-box safe" : "ecdis-safety-box danger"}>
             <b>{route.length<2?"НЕДОСТАТОЧНО ДАННЫХ":routeAssessment.safe?"ОПАСНОСТИ НЕ ОБНАРУЖЕНЫ":"ОБНАРУЖЕНЫ ОПАСНОСТИ"}</b>
-            <span>Требуемая глубина: {requiredDepthM.toFixed(1)} м · минимум на маршруте: {routeAssessment.minimumChartedDepthM === null ? "нет данных" : routeAssessment.minimumChartedDepthM.toFixed(1) + " м"}</span>
-            {routeAssessment.warnings.length ? routeAssessment.warnings.map((warning,index)=><small key={index}>{warning}</small>) : <small>Проверка выполнена по имеющимся данным учебной карты.</small>}
+            <span>Требуемая глубина: {requiredDepthM.toFixed(1)} м · Safety depth: {safetyDepthM.toFixed(1)} м · контуры {safetyContourM.toFixed(1)}/{shallowContourM.toFixed(1)} м · минимум на маршруте: {routeAssessment.minimumChartedDepthM === null ? "нет данных" : routeAssessment.minimumChartedDepthM.toFixed(1) + " м"}</span>
+            {requiredDepthM < safetyDepthM && <small>Safety depth выше расчётной требуемой глубины: проверьте настройки.</small>}\n            {routeAssessment.warnings.length ? routeAssessment.warnings.map((warning,index)=><small key={index}>{warning}</small>) : <small>Проверка выполнена по имеющимся данным учебной карты.</small>}
           </div>
         </section>
         <section className="ecdis-data-block">
