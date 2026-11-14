@@ -7,6 +7,9 @@ import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } fro
 
 const STEP_SECONDS = 0.1;
 const RADAR_RANGE_NM = 3;
+const RADAR_VECTOR_MINUTES = 6;
+const RADAR_CENTER = 250;
+const RADAR_RADIUS_PX = 220;
 
 function formatTime(seconds: number) {
   const total = Math.floor(seconds);
@@ -120,12 +123,13 @@ export default function App() {
     setTargets(resetTargets);
   };
 
-  const x = 250 + (ship.eastNm / RADAR_RANGE_NM) * 220;
-  const y = 250 - (ship.northNm / RADAR_RANGE_NM) * 220;
+  // North-up PPI: own ship remains at the display centre; contacts are plotted relative to it.
+  const x = RADAR_CENTER;
+  const y = RADAR_CENTER;
   const eblRadians = eblBearingDeg * Math.PI / 180;
-  const eblX = x + Math.sin(eblRadians) * 220;
-  const eblY = y - Math.cos(eblRadians) * 220;
-  const vrmRadiusPx = (vrmRangeNm / RADAR_RANGE_NM) * 220;
+  const eblX = x + Math.sin(eblRadians) * RADAR_RADIUS_PX;
+  const eblY = y - Math.cos(eblRadians) * RADAR_RADIUS_PX;
+  const vrmRadiusPx = (vrmRangeNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
   const ownVessel: VesselState = { id: "OWN", xNm: ship.eastNm, yNm: ship.northNm, courseDeg: ship.headingDeg, speedKn: ship.speedKn };
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
 
@@ -170,17 +174,24 @@ export default function App() {
             {[58,117,176,235].map((r)=><circle key={r} cx="250" cy="250" r={r} className="radar-ring"/>)
             }
             <path d="M250 15V485 M15 250H485" className="radar-cross"/>
-            <path d={"M250 250 L" + x + " " + y} className="track-line"/>
             <circle cx={x} cy={y} r={vrmRadiusPx} className="vrm-ring"/>
             <path d={"M" + x + " " + y + " L" + eblX + " " + eblY} className="ebl-line"/>
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
             {targets.map((target) => {
-              const tx = 250 + (target.xNm / RADAR_RANGE_NM) * 220;
-              const ty = 250 - (target.yNm / RADAR_RANGE_NM) * 220;
+              const relativeEastNm = target.xNm - ship.eastNm;
+              const relativeNorthNm = target.yNm - ship.northNm;
+              const tx = RADAR_CENTER + (relativeEastNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
+              const ty = RADAR_CENTER - (relativeNorthNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
+              const vectorDistanceNm = target.speedKn * (RADAR_VECTOR_MINUTES / 60);
+              const vectorLengthPx = (vectorDistanceNm / RADAR_RANGE_NM) * RADAR_RADIUS_PX;
               return <g key={target.id} transform={"translate(" + tx + " " + ty + ")"}>
-                <circle r="8" className="target-echo"/>
-                <path d="M0 -19 L0 -9 M-5 -14 L0 -19 L5 -14" className="target-course"/>
+                <g transform={"rotate(" + target.courseDeg + ")"}>
+                  <path d={"M0 0 L0 " + -vectorLengthPx} className="target-vector"/>
+                  <path d={"M-5 " + (-vectorLengthPx + 8) + " L0 " + -vectorLengthPx + " L5 " + (-vectorLengthPx + 8)} className="target-vector-head"/>
+                </g>
+                <circle r="7" className="target-echo"/>
                 <text x="12" y="4">{target.id}</text>
+                <text x="12" y="17" className="target-course-label">{target.courseDeg.toFixed(0)}°T</text>
               </g>;
             })}
             <g transform={"translate(" + x + " " + y + ") rotate(" + ship.headingDeg + ")"}><path d="M0 -18 L10 15 L0 9 L-10 15 Z" className="own-ship"/></g>
