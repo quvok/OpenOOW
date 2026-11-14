@@ -486,7 +486,8 @@ export function importGeoJsonChart(input: unknown, origin: GeoOrigin, chartName 
     } else if (geometryType === "Point") {
       const position = geoJsonPosition(coordinates, origin);
       if (!position) continue;
-      if (isSounding && (depth !== null || (Array.isArray(coordinates) && typeof coordinates[2] === "number"))) soundings.push({ id, depthM: depth ?? Number(coordinates[2]), position });
+      const pointDepth = Array.isArray(coordinates) && typeof coordinates[2] === "number" ? coordinates[2] : null;
+      if (isSounding && (depth !== null || pointDepth !== null)) soundings.push({ id, depthM: depth ?? pointDepth ?? 0, position });
       else if (isHazard) hazards.push({ id, name, position, radiusNm: 0.08 });
     } else if (geometryType === "MultiPoint" && isSounding && Array.isArray(coordinates)) {
       coordinates.forEach((coordinate, part) => {
