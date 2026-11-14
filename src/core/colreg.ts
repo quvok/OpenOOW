@@ -487,6 +487,15 @@ export function assessColregEncounter(
       }
     }
 
+    if (primaryRule !== null && primaryRule >= 12 && primaryRule <= 18) {
+      addDuty(applicableRules, {
+        rule: primaryRule,
+        title: primaryRule === 12 ? "Парусные суда" : primaryRule === 13 ? "Обгон" : primaryRule === 14 ? "Встречное сближение" : primaryRule === 15 ? "Пересечение курсов" : "Взаимные обязанности судов",
+        duty: ownShipDuty,
+        status: "applies",
+      });
+    }
+
     if (primaryRule === 13 || primaryRule === 15 || primaryRule === 18 || primaryRule === 12) {
       if (responsibility === "give-way") {
         applicableRules.push({ rule: 16, title: "Судно, уступающее дорогу", duty: "Предпринимайте заблаговременное и решительное действие, чтобы чисто разойтись; по возможности избегайте пересечения курса другого судна перед его носом.", status: "applies" });
