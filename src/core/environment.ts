@@ -86,7 +86,7 @@ export function calculateEnvironmentalMotion(
   const relativeWindFrom = ((environment.windFromDeg - headingDeg + 540) % 360) - 180;
   const windFactor = Math.min(environment.windSpeedKn / parameters.referenceWindSpeedKn, 2);
   const leewayDeg = clamp(
-    parameters.leewayAtReferenceWindDeg * windFactor * Math.sin(relativeWindFrom * Math.PI / 180),
+    -parameters.leewayAtReferenceWindDeg * windFactor * Math.sin(relativeWindFrom * Math.PI / 180),
     -12,
     12,
   );
@@ -102,7 +102,10 @@ export function calculateEnvironmentalMotion(
   return {
     leewayDeg,
     speedThroughWaterKn: speedThroughWater,
-    groundSpeedKn: speedThroughWater + environment.currentSpeedKn * Math.cos(currentRad - trackRad),
+    groundSpeedKn: Math.hypot(
+      speedThroughWater * Math.sin(trackRad) + environment.currentSpeedKn * Math.sin(currentRad),
+      speedThroughWater * Math.cos(trackRad) + environment.currentSpeedKn * Math.cos(currentRad),
+    ),
     eastVelocityKn: speedThroughWater * Math.sin(trackRad) + environment.currentSpeedKn * Math.sin(currentRad),
     northVelocityKn: speedThroughWater * Math.cos(trackRad) + environment.currentSpeedKn * Math.cos(currentRad),
     groundTrackDeg: normalize360(Math.atan2(
