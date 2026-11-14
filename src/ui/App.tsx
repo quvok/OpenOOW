@@ -83,7 +83,6 @@ export default function App() {
   const [trialDeceleration, setTrialDeceleration] = useState(0.5);
   const [trialHorizonMin, setTrialHorizonMin] = useState(20);
   const [targetInfoMenuOpen, setTargetInfoMenuOpen] = useState(false);
-  const [targetInfoPage, setTargetInfoPage] = useState("overview");
   const [selectedRadarTargetId, setSelectedRadarTargetId] = useState<string | null>(null);
   const [targetInfoTab, setTargetInfoTab] = useState<string>("multiple");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
