@@ -545,3 +545,11 @@ input[type=range]{accent-color:#a6b58b}
 .target-information-panel>.target-info-expanded-blocks .panel-heading{margin-bottom:10px}
 .target-information-panel>.target-info-expanded-blocks .colreg-live-panel{max-width:100%}
 .target-information-panel>.target-info-expanded-blocks .autopilot-panel{max-width:100%}
+
+
+/* Target Information arrow: choose one instrument panel, then show only that panel */
+.target-info-expanded-blocks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:0;padding:6px;background:#111c22;border:1px solid #657780;border-top:0;box-shadow:0 8px 18px #0009}
+.target-info-expanded-blocks button{min-width:0;padding:9px 8px;text-align:left;background:linear-gradient(#455760,#202d34);border:1px solid #52636c;color:#e3eaed;font:600 9px 'DM Mono',monospace;cursor:pointer}
+.target-info-expanded-blocks button:hover,.target-info-expanded-blocks button.active{background:linear-gradient(#9aabb1,#53656d);color:#101a20}
+.target-information-panel>.panel{width:100%;min-width:0;margin:8px 0 0}
+@media(max-width:560px){.target-info-expanded-blocks{grid-template-columns:1fr 1fr}.target-info-expanded-blocks button{font-size:8px;padding:8px 6px}}
