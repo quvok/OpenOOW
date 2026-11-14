@@ -90,6 +90,16 @@ describe("ARPA acquisition and tracking", () => {
     expect(tracks.B.swapDetected).toBe(true);
     expect(tracks.A.swapCount).toBe(1);
     expect(tracks.B.swapCount).toBe(1);
+    expect(tracks.A.lastSwapSeconds).toBe(5);
+
+    tracks = updateArpaTracks(tracks, [
+      { id: "A", xNm: 1 + 5 / 3600 * 7.5, yNm: 0 },
+      { id: "B", xNm: 5 / 3600 * 7.5, yNm: 0 },
+    ], 7.5);
+    expect(tracks.A.associatedRadarId).toBe("B");
+    expect(tracks.B.associatedRadarId).toBe("A");
+    expect(tracks.A.swapDetected).toBe(false);
+    expect(tracks.A.swapCount).toBe(1);
   });
 
   it("does not associate echoes outside the prediction gate", () => {
