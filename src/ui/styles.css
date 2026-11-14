@@ -500,3 +500,6 @@ input[type=range]{accent-color:#a6b58b}
 .target-info-metrics em{grid-column:1/-1;font:8px 'DM Mono',monospace;color:#91a0a5;font-style:normal;text-align:right}
 .target-info-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:5px;padding:8px 3px 1px;color:#93a3a8;font:7px 'DM Mono',monospace;letter-spacing:.25px}
 @media(max-width:1100px){.target-info-table{min-width:540px}.target-info-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.target-info-multiple-table{min-width:0;table-layout:fixed}.target-info-multiple-table th:first-child{width:66px}.target-info-multiple-table thead th button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0}.target-info-multiple-table thead th button.selected{color:#ffdc83}.target-info-multiple-table tbody th{text-align:left;color:#e0e8eb;background:#29373e}.target-info-multiple-table td.selected{background:#3d5058;color:#ffe08a}
+@media(max-width:1100px){.target-info-multiple-table{min-width:0}.target-info-multiple-table th,.target-info-multiple-table td{padding:7px 3px;font-size:8px}}
