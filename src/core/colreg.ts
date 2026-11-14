@@ -204,6 +204,9 @@ function normalizeEnvironment(options: ColregAssessmentOptions): ColregEnvironme
   if (options.restrictedVisibility !== undefined && options.environment?.visibility === undefined) {
     environment.visibility = options.restrictedVisibility ? "restricted" : "good";
   }
+  if (environment.ownOvertakingNotClear && environment.targetOvertakingNotClear) {
+    throw new RangeError("Only one vessel can be marked as still overtaking in this pair.");
+  }
   if (!Number.isFinite(environment.riskDcpaNm) || (environment.riskDcpaNm ?? -1) < 0) {
     throw new RangeError("Risk DCPA threshold must be finite and non-negative.");
   }
@@ -232,14 +235,14 @@ function classifyRule18(
   own: ColregVesselProfile,
   target: ColregVesselProfile,
 ): { responsibility: ColregResponsibility; duty: string } {
+  if (own.kind === "constrained-draught" && target.kind === "constrained-draught") {
+    return { responsibility: "undetermined", duty: "Оба судна ограничены своей осадкой. Правило 18 не устанавливает приоритет между ними; каждое должно учитывать условия и не затруднять безопасное движение другого." };
+  }
   if (own.kind === "constrained-draught" && target.kind !== "nuc" && target.kind !== "ram") {
     return {
       responsibility: "no-specific-duty",
       duty: "Судно ограничено своей осадкой. Другие суда, кроме NUC/RAM, должны по возможности не затруднять его безопасный проход; это не даёт автоматического права требовать уступить дорогу во всех ситуациях.",
     };
-  }
-  if (own.kind === "constrained-draught" && target.kind === "constrained-draught") {
-    return { responsibility: "undetermined", duty: "Оба судна ограничены своей осадкой. Правило 18 не устанавливает приоритет между ними; каждое должно учитывать условия и не затруднять безопасное движение другого." };
   }
   if (target.kind === "constrained-draught" && own.kind !== "nuc" && own.kind !== "ram") {
     return {
