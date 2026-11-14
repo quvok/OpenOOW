@@ -64,27 +64,25 @@ export default function App() {
         const elapsedSeconds = (timestamp - previousTimestamp) / 1000;
         previousTimestamp = timestamp;
 
+        // Advance own ship and all traffic in one shared fixed-step clock.
+        // This prevents the two sets of vessels from ever accumulating different time.
         const result = advanceFixedSteps(
-          shipRef.current,
+          { ownShip: shipRef.current, targets: targetsRef.current },
           elapsedSeconds,
           accumulatorRef.current,
           STEP_SECONDS,
-          stepShip,
-        );
-        const trafficResult = advanceFixedSteps(
-          targetsRef.current,
-          elapsedSeconds,
-          accumulatorRef.current,
-          STEP_SECONDS,
-          (currentTargets, dtSeconds) => currentTargets.map((target) => advanceVessel(target, dtSeconds)),
+          (current, dtSeconds) => ({
+            ownShip: stepShip(current.ownShip, dtSeconds),
+            targets: current.targets.map((target) => advanceVessel(target, dtSeconds)),
+          }),
         );
 
-        shipRef.current = result.state;
-        targetsRef.current = trafficResult.state;
+        shipRef.current = result.state.ownShip;
+        targetsRef.current = result.state.targets;
         accumulatorRef.current = result.accumulatorSeconds;
         if (result.stepsExecuted > 0) {
-          setShip(result.state);
-          setTargets(trafficResult.state);
+          setShip(result.state.ownShip);
+          setTargets(result.state.targets);
         }
       }
 
