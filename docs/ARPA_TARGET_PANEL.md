@@ -62,3 +62,8 @@ The association model uses predicted target position and one-to-one global assig
 ## Limitations
 
 All displayed values are training data derived from simulated radar measurements. CPA/TCPA assumes constant current velocities; Trial Manoeuvre uses a separate simplified turn-rate/acceleration model. Wind, current, leeway, sensor fusion, AIS, real radar clutter, sea/rain clutter controls, and manufacturer-specific tracking filters are not represented. The simulator is not certified and must not be used for real navigation.
+
+
+## Automatic Trial Manoeuvre ROT (v0.23.6)
+
+The manual ROT input has been removed from both Trial Manoeuvre interfaces. ROT is now estimated from the current own-ship speed and the simulator's simplified ship model: reference speed, speed-squared rudder effectiveness, and maximum turn rate at hard-over rudder. The readout updates automatically as own-ship speed changes. It is a model estimate, not a value from a real vessel's manoeuvring booklet; at very low speed a 0.1°/min display floor is used to keep the trial solver numerically usable.
