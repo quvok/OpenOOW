@@ -294,7 +294,7 @@ describe("COLREG context and encounter assessment", () => {
       ownProfile: { kind: "fishing", engagedInFishing: true },
       environment: { narrowChannel: true, targetNavigatingChannel: true },
     });
-    expect(result.applicableRules.some((rule) => rule.rule === 9 && rule.title.includes("Рыболовное"))).toBe(true);
+    expect(result.applicableRules.some((rule) => rule.rule === 9 && rule.duty.includes("рыболовное судно"))).toBe(true);
   });
 
   it("does not invent priority between two vessels constrained by draught", () => {
