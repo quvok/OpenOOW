@@ -173,7 +173,7 @@ function profileRank(kind: ColregVesselKind): number | null {
   if (kind === "nuc" || kind === "ram") return 3;
   if (kind === "fishing") return 2;
   if (kind === "sailing") return 1;
-  if (kind === "power-driven" || kind === "pilot" || kind === "towing" || kind === "other") return 0;
+  if (kind === "power-driven" || kind === "pilot" || kind === "towing") return 0;
   return null;
 }
 
@@ -307,8 +307,7 @@ export function assessColregEncounter(
     });
 
     if (ownProfile.underway && targetProfile.underway &&
-        (ownProfile.kind === "sailing" || ownProfile.underSailAndPower) &&
-        (targetProfile.kind === "sailing" || targetProfile.underSailAndPower)) {
+        ownProfile.kind === "sailing" && targetProfile.kind === "sailing") {
       encounter = "sailing-meeting";
       primaryRule = 12;
       title = "Сближение двух парусных судов";
@@ -324,8 +323,11 @@ export function assessColregEncounter(
         ownShipDuty = ownProfile.windward
           ? "На одном галсе наветренное судно должно держаться в стороне от подветренного."
           : "Подветренное судно сохраняет курс и скорость; контролируйте обстановку.";
+      } else if (ownProfile.tack === "port" && targetProfile.tack === "unknown") {
+        ownShipDuty = "Вы не можете определить галс другого парусного судна, находясь на левом галсе. По правилу 12(c) держитесь в стороне от него.";
+        responsibility = "give-way";
       } else {
-        ownShipDuty = "Нельзя надёжно определить галс или наветренную сторону. При сомнении примените консервативное действие: держитесь в стороне от другого парусного судна.";
+        ownShipDuty = "Нельзя надёжно определить галс или наветренную сторону. При сомнении примените консервативное действие и уточните положение ветра и парусов.";
         responsibility = "undetermined";
       }
       applicableRules.push({ rule: 12, title: "Парусные суда", duty: ownShipDuty, status: "applies" });
@@ -415,6 +417,8 @@ export function assessColregEncounter(
 
   const ownLightGuidance = getVesselLightGuidance(ownProfile.kind);
   const targetLightGuidance = getVesselLightGuidance(targetProfile.kind);
+  if (ownProfile.underSailAndPower) ownLightGuidance.dayShapes.push("Чёрный конус вершиной вниз: судно идёт под парусами и одновременно использует механическую установку.");
+  if (targetProfile.underSailAndPower) targetLightGuidance.dayShapes.push("Чёрный конус вершиной вниз: судно идёт под парусами и одновременно использует механическую установку.");
   const limitations = [
     "Классификация геометрическая и зависит от введённых профилей; алгоритм не распознаёт огни, знаки, тип судна или его фактическую операцию автоматически.",
     "CPA/TCPA предполагает постоянство курсов и скоростей. Манёвры, дрейф, ветер, течение, мелководье и гидродинамическое взаимодействие не моделируются.",
