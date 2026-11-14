@@ -398,7 +398,8 @@ export default function App() {
   // Trial ROT is estimated from the simulator vessel model at the current speed, using hard-over rudder capability.
   const trialSpeedRatio = ship.speedKn / DEFAULT_SHIP_PARAMETERS.referenceSpeedKn;
   const trialSpeedFactor = Math.min(trialSpeedRatio * trialSpeedRatio, 1.5);
-  const trialRotDegPerMin = Math.max(0.1, Math.min(30, DEFAULT_SHIP_PARAMETERS.maxTurnRateDegPerSec * trialSpeedFactor * 60));\n  const selectedTrialSolution = selectedInfoRow ? calculateDynamicTrialManoeuvre(
+  const trialRotDegPerMin = Math.max(0.1, Math.min(30, DEFAULT_SHIP_PARAMETERS.maxTurnRateDegPerSec * trialSpeedFactor * 60));
+  const selectedTrialSolution = selectedInfoRow ? calculateDynamicTrialManoeuvre(
     selectedInfoRow.track, selectedInfoRow.latest, ownVessel,
     { courseDeg: trialCourseDeg, speedKn: trialSpeedKn, delayMin: trialDelayMin,
       turnRateDegPerMin: trialRotDegPerMin, accelerationKnPerMin: trialAcceleration,
