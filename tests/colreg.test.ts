@@ -169,6 +169,16 @@ describe("COLREG context and encounter assessment", () => {
   });
 
 
+
+  it("treats a seaplane on the water as a power-driven vessel for encounter rules", () => {
+    const result = assessColregEncounter(own(), target(1, 1, 270, 8), {
+      ownProfile: { kind: "seaplane", seaplaneOnWater: true },
+      targetProfile: { kind: "power-driven" },
+    });
+    expect(result.encounter).toBe("crossing-starboard");
+    expect(result.ownLightGuidance.rule).toBe(23);
+  });
+
   it("applies Rule 18(f) to a WIG in flight and power-driven rules when on the water", () => {
     const airborne = assessColregEncounter(own(), target(1, 1, 270, 8), {
       ownProfile: { kind: "wig-craft", wigOnSurface: false },
