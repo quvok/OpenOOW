@@ -206,6 +206,17 @@ export default function EcdisModule({ ship, targets }: Props) {
             {showHazards && TRAINING_CHART_HAZARDS.map((hazard) => { const point = toScreen(hazard.position.eastNm, hazard.position.northNm); return <g key={hazard.id}><circle cx={point.x} cy={point.y} r={hazard.radiusNm*SCALE} className="ecdis-hazard-zone"/><path d={`M ${point.x-8} ${point.y-8} L ${point.x+8} ${point.y+8} M ${point.x+8} ${point.y-8} L ${point.x-8} ${point.y+8}`} className="ecdis-hazard-mark"/><text x={point.x+12} y={point.y-10} className="ecdis-hazard-label">{hazard.name}</text></g>; })}
             {route.length > 1 && <polyline points={polygonPoints(route)} className="ecdis-route-halo"/>}
             {route.length > 1 && <polyline points={polygonPoints(route)} className="ecdis-route-line"/>}
+            {activeNavigation && <line x1={toScreen(activeNavigation.from.eastNm,activeNavigation.from.northNm).x} y1={toScreen(activeNavigation.from.eastNm,activeNavigation.from.northNm).y} x2={toScreen(activeNavigation.to.eastNm,activeNavigation.to.northNm).x} y2={toScreen(activeNavigation.to.eastNm,activeNavigation.to.northNm).y} className="ecdis-active-leg"/>}
+            {route.length > 2 && route.slice(1,-1).map((point,index) => {
+              const incoming=bearingDeg(route[index],point);
+              const outgoing=bearingDeg(point,route[index+2]);
+              const delta=((outgoing-incoming+540)%360)-180;
+              const distance=calculateWheelOverDistanceNm(ship.speedKn,plannedRotDegPerMin,delta);
+              if (distance===null || distance<=0) return null;
+              const wol={eastNm:point.eastNm-Math.sin(incoming*Math.PI/180)*distance,northNm:point.northNm-Math.cos(incoming*Math.PI/180)*distance};
+              const p=toScreen(wol.eastNm,wol.northNm);
+              return <g key={"wol-"+point.id} className="ecdis-wheel-over"><circle cx={p.x} cy={p.y} r="7"/><text x={p.x+9} y={p.y-7}>WOL</text></g>;
+            })}
             {crossTrack && <circle cx={toScreen(crossTrack.nearestPoint.eastNm,crossTrack.nearestPoint.northNm).x} cy={toScreen(crossTrack.nearestPoint.eastNm,crossTrack.nearestPoint.northNm).y} r={xtdNm*SCALE} className="ecdis-xtd-limit"/>}
             {crossTrack && <line x1={toScreen(ownPosition.eastNm,ownPosition.northNm).x} y1={toScreen(ownPosition.eastNm,ownPosition.northNm).y} x2={toScreen(crossTrack.nearestPoint.eastNm,crossTrack.nearestPoint.northNm).x} y2={toScreen(crossTrack.nearestPoint.eastNm,crossTrack.nearestPoint.northNm).y} className="ecdis-xte-line"/>}
             {route.map((point,index) => { const p=toScreen(point.eastNm,point.northNm); return <g key={point.id} className="ecdis-waypoint" onClick={(event)=>{event.stopPropagation();setSelectedWaypointId(point.id);}}><circle cx={p.x} cy={p.y} r="9"/><text x={p.x+12} y={p.y-10}>{index+1}</text></g>; })}
