@@ -24,3 +24,7 @@
 .target-trail{fill:none;stroke:#d99b5c;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:2 3;opacity:.58;pointer-events:none}
 
 .trail-dot{background:#d99b5c}
+
+
+/* ARPA acquisition and tracking panel */
+.arpa-table{min-width:760px}.arpa-status{font-size:10px}.arpa-status.acquiring{color:#e5c477}.arpa-status.tracking{color:#8ee0b8}.arpa-status.lost{color:#ef9a91}.arpa-action{padding:7px 10px;min-width:78px;font-size:10px}.arpa-panel{margin-bottom:16px}
