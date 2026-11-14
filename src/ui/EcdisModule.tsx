@@ -59,15 +59,15 @@ export default function EcdisModule({ ship, targets }: Props) {
   const remainingDistance = crossTrack ? Math.max(0, routeAssessment.totalDistanceNm - crossTrack.alongTrackNm) : routeAssessment.totalDistanceNm;
   const etaMinutes = ship.speedKn > 0.1 ? remainingDistance / ship.speedKn * 60 : null;
   const geoOwn = toGeographicPosition(ownPosition, origin);
-  const mapTransform = "translate(" + CENTER_X + " " + CENTER_Y + ") scale(" + chartScale + ") translate(" + -CENTER_X + " " + -CENTER_Y + ")";
+  const mapTransform = "translate(" + (CENTER_X - ship.eastNm * SCALE * chartScale) + " " + (CENTER_Y + ship.northNm * SCALE * chartScale) + ") scale(" + chartScale + ") translate(" + -CENTER_X + " " + -CENTER_Y + ")";
 
   const addWaypoint = (event: MouseEvent<SVGSVGElement>) => {
     if (!routeEdit) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const px = (event.clientX - rect.left) * WIDTH / rect.width;
     const py = (event.clientY - rect.top) * HEIGHT / rect.height;
-    const eastNm = (px - CENTER_X) / (SCALE * chartScale);
-    const northNm = (CENTER_Y - py) / (SCALE * chartScale);
+    const eastNm = ship.eastNm + (px - CENTER_X) / (SCALE * chartScale);
+    const northNm = ship.northNm + (CENTER_Y - py) / (SCALE * chartScale);
     if (Math.abs(eastNm) > 11.5 || Math.abs(northNm) > 8.2) return;
     setRoute((current) => [...current, makeWaypoint(current.length + 1, Number(eastNm.toFixed(3)), Number(northNm.toFixed(3)))]);
     setStatusMessage("Маршрутная точка добавлена. Продолжайте прокладку или отключите режим редактирования.");
@@ -100,7 +100,7 @@ export default function EcdisModule({ ship, targets }: Props) {
     </div>
     <div className="ecdis-layout">
       <section className="ecdis-chart-panel">
-        <div className="ecdis-map-meta"><span>DISPLAY: RELATIVE LOCAL GRID</span><span>DEPTH UNITS: METRES</span><span>SCALE 1:{Math.round(50000 / chartScale).toLocaleString("ru-RU")}</span></div>
+        <div className="ecdis-map-meta"><span>DISPLAY: OWN SHIP FOLLOW · NORTH UP</span><span>DEPTH UNITS: METRES</span><span>SCALE 1:{Math.round(50000 / chartScale).toLocaleString("ru-RU")}</span></div>
         <svg className="ecdis-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Учебная электронная навигационная карта" onClick={addWaypoint}>
           <defs>
             <pattern id="ecdis-grid" width={SCALE} height={SCALE} patternUnits="userSpaceOnUse">
@@ -148,7 +148,7 @@ export default function EcdisModule({ ship, targets }: Props) {
           <div className="ecdis-readout-grid">
             <div><small>ПОЗИЦИЯ E</small><b>{ship.eastNm.toFixed(3)} NM</b></div><div><small>ПОЗИЦИЯ N</small><b>{ship.northNm.toFixed(3)} NM</b></div>
             <div><small>КУРС</small><b>{ship.headingDeg.toFixed(1)}° T</b></div><div><small>СКОРОСТЬ</small><b>{ship.speedKn.toFixed(1)} kn</b></div>
-            <div><small>ГЛУБИНА КАРТЫ</small><b>{ownDepth.toFixed(1)} m</b></div><div><small>ТРЕБУЕМАЯ</small><b>{requiredDepthM.toFixed(1)} m</b></div>
+            <div><small>ГЛУБИНА КАРТЫ</small><b>{ownDepth === null ? "НЕТ ДАННЫХ" : ownDepth.toFixed(1) + " m"}</b></div><div><small>ТРЕБУЕМАЯ</small><b>{requiredDepthM.toFixed(1)} m</b></div>
           </div>
         </section>
         <section className="ecdis-data-block">
@@ -175,15 +175,15 @@ export default function EcdisModule({ ship, targets }: Props) {
           <div className="ecdis-block-heading"><span>SAFETY CHECK</span><b>ПРОВЕРКА БЕЗОПАСНОСТИ</b></div>
           <div className={routeAssessment.safe ? "ecdis-safety-box safe" : "ecdis-safety-box danger"}>
             <b>{route.length<2?"НЕДОСТАТОЧНО ДАННЫХ":routeAssessment.safe?"ОПАСНОСТИ НЕ ОБНАРУЖЕНЫ":"ОБНАРУЖЕНЫ ОПАСНОСТИ"}</b>
-            <span>Требуемая глубина: {requiredDepthM.toFixed(1)} м · минимум на маршруте: {routeAssessment.minimumChartedDepthM.toFixed(1)} м</span>
-            {routeAssessment.warnings.length ? routeAssessment.warnings.map((warning,index)=><small key={index}>{warning}</small>) : <small>Маршрут не пересекает известные объекты учебной карты.</small>}
+            <span>Требуемая глубина: {requiredDepthM.toFixed(1)} м · минимум на маршруте: {routeAssessment.minimumChartedDepthM === null ? "нет данных" : routeAssessment.minimumChartedDepthM.toFixed(1) + " м"}</span>
+            {routeAssessment.warnings.length ? routeAssessment.warnings.map((warning,index)=><small key={index}>{warning}</small>) : <small>Проверка выполнена по имеющимся данным учебной карты.</small>}
           </div>
         </section>
         <section className="ecdis-data-block">
           <div className="ecdis-block-heading"><span>CHART REFERENCE</span><b>КООРДИНАТНАЯ ОСНОВА</b></div>
           <label className="ecdis-setting"><span>Широта начала, °</span><input type="number" min="-89.9" max="89.9" step="0.0001" value={origin.latitudeDeg} onChange={(event)=>updateOrigin("latitudeDeg",event.target.value)}/></label>
           <label className="ecdis-setting"><span>Долгота начала, °</span><input type="number" min="-180" max="180" step="0.0001" value={origin.longitudeDeg} onChange={(event)=>updateOrigin("longitudeDeg",event.target.value)}/></label>
-          <p className="ecdis-disclaimer">Данные карты синтетические и предназначены только для обучения. Это не официальная ENC, не S-57/S-101 и не пригодно для реального судовождения. Географические координаты вычисляются относительно заданной точки начала в локальной плоской системе.</p>
+          <p className="ecdis-disclaimer">Данные карты синтетические и предназначены только для обучения. Некартографированные участки помечаются как неизвестные и не считаются безопасными. Это не официальная ENC, не S-57/S-101 и не пригодно для реального судовождения. Географические координаты вычисляются относительно заданной точки начала в локальной плоской системе.</p>
         </section>
       </aside>
     </div>
