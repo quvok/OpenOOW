@@ -83,7 +83,7 @@ export default function App() {
   const [trialDeceleration, setTrialDeceleration] = useState(0.5);
   const [trialHorizonMin, setTrialHorizonMin] = useState(20);
   const [targetInfoMenuOpen, setTargetInfoMenuOpen] = useState(false);
-  const [selectedTargetInfoBlock, setSelectedTargetInfoBlock] = useState<string | null>(null);
+  const [selectedTargetInfoBlock, setSelectedTargetInfoBlock] = useState<string | null>("target-info");
   const [selectedRadarTargetId, setSelectedRadarTargetId] = useState<string | null>(null);
   const [targetInfoTab, setTargetInfoTab] = useState<string>("multiple");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
@@ -392,7 +392,7 @@ export default function App() {
     return { track, latest, solution: calculateArpaSolution(track, latest, ownVessel), bow: calculateBowCrossing(track, latest, ownVessel) };
   }).filter((row): row is NonNullable<typeof row> => row !== null);
   const selectedInfoRow = arpaInfoRows.find((row) => row.track.targetId === targetInfoTab) ??
-    arpaInfoRows.find((row) => row.track.associatedRadarId === selectedRadarTargetId) ?? null;
+    arpaInfoRows.find((row) => row.track.associatedRadarId === selectedRadarTargetId) ?? arpaInfoRows[0] ?? null;
   const selectedTrialSolution = selectedInfoRow ? calculateDynamicTrialManoeuvre(
     selectedInfoRow.track, selectedInfoRow.latest, ownVessel,
     { courseDeg: trialCourseDeg, speedKn: trialSpeedKn, delayMin: trialDelayMin,
@@ -521,7 +521,7 @@ export default function App() {
                   " L" + vector.dx + " " + vector.dy +
                   " L" + (baseX + unitY * wing) + " " + (baseY - unitX * wing)
                 : "";
-              return <g key={target.id} role="button" tabIndex={0} aria-label={"Выбрать радиолокационную цель " + target.id} aria-pressed={selectedRadarTargetId === target.id} className="radar-contact-hitbox" onClick={() => setSelectedRadarTargetId(target.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedRadarTargetId(target.id); } }}>
+              return <g key={target.id} role="button" tabIndex={0} aria-label={"Выбрать радиолокационную цель " + target.id} aria-pressed={selectedRadarTargetId === target.id} className="radar-contact-hitbox" onClick={() => { setSelectedRadarTargetId(target.id); const match = Object.values(arpaTracks).find((track) => track.associatedRadarId === target.id || track.targetId === target.id); if (match) setTargetInfoTab(match.targetId); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedRadarTargetId(target.id); const match = Object.values(arpaTracks).find((track) => track.associatedRadarId === target.id || track.targetId === target.id); if (match) setTargetInfoTab(match.targetId); } }}>
                 <g transform={"translate(" + point.x + " " + point.y + ")"}>
                 {estimatedTarget && <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>}
                 {estimatedTarget && vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
@@ -563,11 +563,90 @@ export default function App() {
             <div className="target-info-controls"><label>Приоритет <select aria-label="Приоритет источника"><option>ARPA</option></select></label><button type="button" className="target-info-association" title="Сопоставление AIS/ARPA появится после добавления потока AIS">Связь AIS/ARPA</button><label className="target-filter-label">Фильтр AIS <select disabled aria-label="Фильтр AIS"><option>ВЫКЛ. · НЕТ ИСТОЧНИКА AIS</option></select></label></div>
             <div className="target-info-titlebar"><span>ИНФОРМАЦИЯ О ЦЕЛЯХ</span><button type="button" className="target-info-menu-trigger" aria-label="Открыть список приборных блоков" aria-expanded={targetInfoMenuOpen} onClick={() => setTargetInfoMenuOpen((open) => !open)}>{targetInfoMenuOpen ? "▲" : "▼"}</button><small>{arpaInfoRows.length} СОПРОВОЖДАЕМЫХ</small></div>
              {targetInfoMenuOpen && <div className="target-info-expanded-blocks" role="menu" aria-label="Выбор приборного блока">
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "target-info" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("target-info"); setTargetInfoMenuOpen(false); }}>TARGET INFORMATION</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "cpa" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("cpa"); setTargetInfoMenuOpen(false); }}>CPA / TCPA</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "bow" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("bow"); setTargetInfoMenuOpen(false); }}>BCR / BCT</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "history" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("history"); setTargetInfoMenuOpen(false); }}>PAST POSITIONS</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "tracking" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("tracking"); setTargetInfoMenuOpen(false); }}>ARPA TRACKING</button>
+              <button type="button" role="menuitem" className={selectedTargetInfoBlock === "trial" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("trial"); setTargetInfoMenuOpen(false); }}>TRIAL MANOEUVRE</button>
               <button type="button" role="menuitem" className={selectedTargetInfoBlock === "colreg" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("colreg"); setTargetInfoMenuOpen(false); }}>COLREG ASSESSMENT</button>
               <button type="button" role="menuitem" className={selectedTargetInfoBlock === "arpa-targets" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("arpa-targets"); setTargetInfoMenuOpen(false); }}>ARPA TARGETS</button>
               <button type="button" role="menuitem" className={selectedTargetInfoBlock === "arpa-display" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("arpa-display"); setTargetInfoMenuOpen(false); }}>ARPA DISPLAY</button>
               <button type="button" role="menuitem" className={selectedTargetInfoBlock === "autopilot" ? "active" : ""} onClick={() => { setSelectedTargetInfoBlock("autopilot"); setTargetInfoMenuOpen(false); }}>AUTOPILOT</button>
             </div>}
+            {selectedTargetInfoBlock === "target-info" && (
+              <section className="panel console-panel target-info-detail-panel">
+                <div className="panel-heading"><div><span className="eyebrow">OWN ARPA · RADAR TRACK DATA</span><h2>Информация по выбранной цели</h2></div><span className="unit">{arpaInfoRows.length} TGT</span></div>
+                <div className="target-info-tabs" role="tablist" aria-label="Выбор сопровождаемой цели">
+                  {arpaInfoRows.slice(0, 8).map((row, index) => <button type="button" role="tab" aria-selected={targetInfoTab === row.track.targetId} className={targetInfoTab === row.track.targetId ? "active" : ""} key={row.track.targetId} onClick={() => { setTargetInfoTab(row.track.targetId); setSelectedRadarTargetId(row.track.associatedRadarId); }}>T{index + 1} · {row.track.targetId}</button>)}
+                  <button type="button" role="tab" aria-selected={targetInfoTab === "multiple"} className={targetInfoTab === "multiple" ? "active" : ""} onClick={() => setTargetInfoTab("multiple")}>MULTIPLE</button>
+                </div>
+                {targetInfoTab === "multiple" ? (
+                  <div className="target-info-table-wrap">
+                    <table className="target-info-table target-info-multiple-table">
+                      <thead><tr><th>DATA</th>{arpaInfoRows.slice(0, 8).map((row, index) => <th key={row.track.targetId}><button type="button" className={selectedRadarTargetId === row.track.associatedRadarId ? "selected" : ""} onClick={() => { setTargetInfoTab(row.track.targetId); setSelectedRadarTargetId(row.track.associatedRadarId); }}>T{index + 1}</button></th>)}</tr></thead>
+                      <tbody>
+                        {targetInfoMetricRows.map((metric) => <tr key={metric.label}><th>{metric.label}</th>{metric.values.slice(0, 8).map((value, index) => <td key={arpaInfoRows[index].track.targetId}><button type="button" onClick={() => { setTargetInfoTab(arpaInfoRows[index].track.targetId); setSelectedRadarTargetId(arpaInfoRows[index].track.associatedRadarId); }}>{value}</button></td>)}</tr>)}
+                        {arpaInfoRows.length === 0 && <tr><td colSpan={9} className="target-info-empty">НЕТ ARPA-ЦЕЛЕЙ · ВЫБЕРИТЕ ОТМЕТКУ НА PPI И ВЫПОЛНИТЕ ЗАХВАТ</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : selectedInfoRow ? (
+                  <div className="target-info-single">
+                    <div className="target-info-single-heading"><b>{selectedInfoRow.track.targetId}</b><span>{selectedInfoRow.track.status.toUpperCase()} · ECHO {selectedInfoRow.track.associatedRadarId}</span><button type="button" onClick={() => releaseTarget(selectedInfoRow.track.targetId)}>СНЯТЬ ARPA</button></div>
+                    <div className="target-info-metrics">
+                      {[
+                        ["SRC", selectedInfoRow.track.status === "tracking" ? "ARPA" : selectedInfoRow.track.status.toUpperCase(), ""],
+                        ["RNG", selectedInfoRow.solution.rangeNm.toFixed(2), "NM"],
+                        ["BRG", selectedInfoRow.solution.bearingDeg.toFixed(1), "°T"],
+                        ["CPA", selectedInfoRow.solution.dcpaNm === null ? "—" : selectedInfoRow.solution.dcpaNm.toFixed(2), "NM"],
+                        ["TCPA", formatMinutes(selectedInfoRow.solution.tcpaMin), ""],
+                        ["COG", selectedInfoRow.track.estimatedCourseDeg === null ? "—" : selectedInfoRow.track.estimatedCourseDeg.toFixed(1), "°T"],
+                        ["SOG", selectedInfoRow.track.estimatedSpeedKn === null ? "—" : selectedInfoRow.track.estimatedSpeedKn.toFixed(1), "kn"],
+                        ["BCR", selectedInfoRow.bow.bcrNm === null ? "—" : selectedInfoRow.bow.bcrNm.toFixed(2), "NM"],
+                        ["BCT", formatMinutes(selectedInfoRow.bow.bctMin), ""],
+                      ].map(([label, value, unit]) => <div key={label}><small>{label}</small><b>{value}</b><em>{unit}</em></div>)}
+                    </div>
+                    <div className="target-info-track-meta"><span>MEASUREMENTS {selectedInfoRow.track.measurementsUsed}</span><span>LAST SCAN {formatTime(selectedInfoRow.track.lastMeasurementSeconds)}</span><span>SWAPS {selectedInfoRow.track.swapCount}</span></div>
+                  </div>
+                ) : <p className="cpa-note">Нет сопровождаемых целей. Выберите радиолокационную отметку и выполните ручной захват ARPA.</p>}
+              </section>
+            )}
+            {selectedTargetInfoBlock === "cpa" && (
+              <section className="panel console-panel target-info-detail-panel"><div className="panel-heading"><div><span className="eyebrow">ARPA SOLUTION</span><h2>CPA / TCPA</h2></div><span className="unit">{selectedInfoRow?.track.targetId ?? "NO TARGET"}</span></div>
+                {selectedInfoRow ? <div className="target-info-metrics"><div><small>DCPA</small><b>{selectedInfoRow.solution.dcpaNm?.toFixed(2) ?? "—"}</b><em>NM</em></div><div><small>TCPA</small><b>{formatMinutes(selectedInfoRow.solution.tcpaMin)}</b></div><div><small>RANGE</small><b>{selectedInfoRow.solution.rangeNm.toFixed(2)}</b><em>NM</em></div><div><small>BEARING</small><b>{selectedInfoRow.solution.bearingDeg.toFixed(1)}</b><em>°T</em></div></div> : <p className="cpa-note">Сначала захватите цель на PPI.</p>}
+              </section>
+            )}
+            {selectedTargetInfoBlock === "bow" && (
+              <section className="panel console-panel target-info-detail-panel"><div className="panel-heading"><div><span className="eyebrow">BOW CROSSING</span><h2>BCR / BCT</h2></div><span className="unit">{selectedInfoRow?.track.targetId ?? "NO TARGET"}</span></div>
+                {selectedInfoRow ? <div className="target-info-metrics"><div><small>BCR</small><b>{selectedInfoRow.bow.bcrNm?.toFixed(2) ?? "—"}</b><em>NM</em></div><div><small>BCT</small><b>{formatMinutes(selectedInfoRow.bow.bctMin)}</b></div></div> : <p className="cpa-note">Захватите цель и дождитесь состояния TRACK.</p>}
+              </section>
+            )}
+            {selectedTargetInfoBlock === "history" && (
+              <section className="panel console-panel target-info-detail-panel"><div className="panel-heading"><div><span className="eyebrow">MEASURED HISTORY</span><h2>Предыдущие положения</h2></div><span className="unit">{selectedInfoRow?.track.targetId ?? "NO TARGET"}</span></div>
+                {selectedInfoRow ? <div className="target-info-table-wrap"><table className="target-info-table"><thead><tr><th>TIME</th><th>EAST</th><th>NORTH</th><th>ECHO</th></tr></thead><tbody>{selectedInfoRow.track.measurements.slice().reverse().map((sample, index) => <tr key={sample.timeSeconds + "-" + index}><td>{formatTime(sample.timeSeconds)}</td><td>{sample.xNm.toFixed(3)} NM</td><td>{sample.yNm.toFixed(3)} NM</td><td>{sample.radarId ?? "—"}</td></tr>)}</tbody></table></div> : <p className="cpa-note">Нет данных ARPA. Выберите цель и выполните захват.</p>}
+              </section>
+            )}
+            {selectedTargetInfoBlock === "tracking" && (
+              <section className="panel console-panel target-info-detail-panel"><div className="panel-heading"><div><span className="eyebrow">TRACK MANAGEMENT</span><h2>Состояние сопровождения</h2></div><span className="unit">{arpaInfoRows.length} TGT</span></div>
+                {arpaInfoRows.length ? <div className="arpa-live-list">{arpaInfoRows.map((row) => <button type="button" className={selectedRadarTargetId === row.track.associatedRadarId ? "arpa-live-row selected" : "arpa-live-row"} key={row.track.targetId} onClick={() => { setSelectedRadarTargetId(row.track.associatedRadarId); setTargetInfoTab(row.track.targetId); }}><span className="arpa-live-id">{row.track.targetId}<small>{row.track.associatedRadarId}</small></span><span className="arpa-live-status">{row.track.status.toUpperCase()}</span><span className="arpa-live-cpa"><b>{row.track.measurementsUsed}</b><small> SCANS</small></span><span className={row.track.swapDetected ? "arpa-live-alert active" : "arpa-live-alert"}>{row.track.swapDetected ? "!" : " "}</span></button>)}</div> : <p className="cpa-note">Сопровождаемых целей пока нет.</p>}
+              </section>
+            )}
+            {selectedTargetInfoBlock === "trial" && (
+              <section className="panel console-panel target-info-detail-panel"><div className="panel-heading"><div><span className="eyebrow">DYNAMIC PREDICTION</span><h2>Trial Manoeuvre</h2></div><span className="unit">{selectedInfoRow?.track.targetId ?? "NO TARGET"}</span></div>
+                <div className="trial-controls trial-controls-compact">
+                  <label>КУРС °T<input type="number" min="0" max="359" value={trialCourseDeg} onChange={event => setTrialCourseDeg(Math.max(0, Math.min(359, Number(event.target.value) || 0)))}/></label>
+                  <label>СКОРОСТЬ kn<input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={event => setTrialSpeedKn(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></label>
+                  <label>ЗАДЕРЖКА min<input type="number" min="0" max="30" step="0.5" value={trialDelayMin} onChange={event => setTrialDelayMin(Math.max(0, Math.min(30, Number(event.target.value) || 0)))}/></label>
+                  <label>ROT °/min<input type="number" min="0.1" max="30" step="0.5" value={trialRotDegPerMin} onChange={event => setTrialRotDegPerMin(Math.max(0.1, Math.min(30, Number(event.target.value) || 0.1)))}/></label>
+                  <label>РАЗГОН kn/min<input type="number" min="0" max="5" step="0.1" value={trialAcceleration} onChange={event => setTrialAcceleration(Math.max(0, Math.min(5, Number(event.target.value) || 0)))}/></label>
+                  <label>ЗАМЕДЛ. kn/min<input type="number" min="0" max="5" step="0.1" value={trialDeceleration} onChange={event => setTrialDeceleration(Math.max(0, Math.min(5, Number(event.target.value) || 0)))}/></label>
+                  <label>ГОРИЗОНТ min<input type="number" min="1" max="120" value={trialHorizonMin} onChange={event => setTrialHorizonMin(Math.max(1, Math.min(120, Number(event.target.value) || 1)))}/></label>
+                </div>
+                {selectedTrialSolution ? <div className="target-info-metrics"><div><small>TRIAL DCPA</small><b>{selectedTrialSolution.dcpaNm?.toFixed(2) ?? "—"}</b><em>NM</em></div><div><small>TRIAL TCPA</small><b>{formatMinutes(selectedTrialSolution.tcpaMin)}</b></div></div> : <p className="cpa-note">Для расчёта Trial Manoeuvre необходима сопровождаемая цель в состоянии TRACK.</p>}
+                <p className="cpa-note">Расчёт моделирует задержку, ограниченную скорость поворота и изменение скорости. Это учебная модель; она не изменяет реальное движение судна и не заменяет манёвренную документацию судна.</p>
+              </section>
+            )}
             {selectedTargetInfoBlock === "arpa-display" && (
 <section className="panel console-panel">
             <div className="panel-heading"><div><span className="eyebrow">ARPA DISPLAY</span><h2>Векторы целей</h2></div></div>
@@ -585,7 +664,7 @@ export default function App() {
                   (track.measurements.length ? track.measurements[track.measurements.length - 1] : null);
                 const solution = latest ? calculateArpaSolution(track, latest, ownVessel) : null;
                 const alert = solution ? isArpaCloseApproachAlert(track, solution, { minimumDcpaNm: alertDcpaNm, maximumTcpaMinutes: alertTcpaMinutes }) : false;
-                return <button type="button" key={track.targetId} className={selectedRadarTargetId === track.associatedRadarId ? "arpa-live-row selected" : "arpa-live-row"} onClick={() => setSelectedRadarTargetId(track.associatedRadarId)}>
+                return <button type="button" key={track.targetId} className={selectedRadarTargetId === track.associatedRadarId ? "arpa-live-row selected" : "arpa-live-row"} onClick={() => { setSelectedRadarTargetId(track.associatedRadarId); setTargetInfoTab(track.targetId); }}>
                   <span className="arpa-live-id">{track.targetId}<small>{track.associatedRadarId}</small></span>
                   <span className="arpa-live-status">{track.status === "tracking" ? "TRACK" : track.status === "acquiring" ? "ACQ" : "LOST"}</span>
                   <span className="arpa-live-cpa"><b>{solution?.dcpaNm !== null && solution?.dcpaNm !== undefined ? solution.dcpaNm.toFixed(2) : "—"}</b><small> DCPA NM</small></span>
