@@ -4,7 +4,7 @@ import { advanceFixedSteps } from "../core/simulationEngine";
 import { advanceVessel, calculateCpa, velocityFromCourse, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
-import { acquireArpaTarget, calculateArpaSolution, calculateBowCrossing, calculateTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
+import { acquireArpaTarget, calculateArpaSolution, calculateBowCrossing, calculateTrialManoeuvre, calculateDynamicTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
 import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { createAutopilotState, stepAutopilot, type AutopilotState } from "../core/autopilot";
@@ -77,6 +77,13 @@ export default function App() {
   const [vectorMinutes, setVectorMinutes] = useState(6);
   const [trialCourseDeg, setTrialCourseDeg] = useState(ENCOUNTER_SCENARIOS[0].ownShip.courseDeg);
   const [trialSpeedKn, setTrialSpeedKn] = useState(ENCOUNTER_SCENARIOS[0].ownShip.speedKn);
+  const [trialDelayMin, setTrialDelayMin] = useState(3);
+  const [trialRotDegPerMin, setTrialRotDegPerMin] = useState(3);
+  const [trialAcceleration, setTrialAcceleration] = useState(0.5);
+  const [trialDeceleration, setTrialDeceleration] = useState(0.5);
+  const [trialHorizonMin, setTrialHorizonMin] = useState(20);
+  const [targetInfoMenuOpen, setTargetInfoMenuOpen] = useState(false);
+  const [targetInfoPage, setTargetInfoPage] = useState("overview");
   const [selectedRadarTargetId, setSelectedRadarTargetId] = useState<string | null>(null);
   const [targetInfoTab, setTargetInfoTab] = useState<string>("multiple");
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
@@ -386,6 +393,12 @@ export default function App() {
   }).filter((row): row is NonNullable<typeof row> => row !== null);
   const selectedInfoRow = arpaInfoRows.find((row) => row.track.targetId === targetInfoTab) ??
     arpaInfoRows.find((row) => row.track.associatedRadarId === selectedRadarTargetId) ?? null;
+  const selectedTrialSolution = selectedInfoRow ? calculateDynamicTrialManoeuvre(
+    selectedInfoRow.track, selectedInfoRow.latest, ownVessel,
+    { courseDeg: trialCourseDeg, speedKn: trialSpeedKn, delayMin: trialDelayMin,
+      turnRateDegPerMin: trialRotDegPerMin, accelerationKnPerMin: trialAcceleration,
+      decelerationKnPerMin: trialDeceleration, horizonMin: trialHorizonMin },
+  ) : null;
   const targetInfoMetricRows = [
     { label: "SRC", values: arpaInfoRows.map(({track}) => track.status === "tracking" ? "ARPA" : track.status === "lost" ? "LOST" : "ACQ") },
     { label: "CPA", values: arpaInfoRows.map(({solution}) => solution.dcpaNm === null ? "—" : solution.dcpaNm.toFixed(2)) },
@@ -548,21 +561,44 @@ export default function App() {
           <section className="panel console-panel target-information-panel">
             <div className="target-info-topline"><div><span className="eyebrow">ARPA / TARGET DATA</span><h2>Targets Information</h2></div><span className="target-source-indicator">● OWN ARPA</span></div>
             <div className="target-info-controls"><label>Priority <select aria-label="Приоритет источника"><option>ARPA</option></select></label><button type="button" className="target-info-association" title="AIS/ARPA association будет доступна после добавления AIS-потока">Association</button><label className="target-filter-label">AIS filter <select disabled aria-label="Фильтр AIS"><option>OFF · NO AIS SOURCE</option></select></label></div>
-            <div className="target-info-titlebar"><span>Targets Information</span><small>{arpaInfoRows.length} TRACKED</small></div>
-            <div className="target-info-tabs" role="tablist" aria-label="Отображение целей">
-              {arpaInfoRows.slice(0,6).map((row,index)=><button type="button" role="tab" aria-selected={targetInfoTab===row.track.targetId} className={targetInfoTab===row.track.targetId?"active":""} key={row.track.targetId} onClick={()=>{setTargetInfoTab(row.track.targetId);setSelectedRadarTargetId(row.track.associatedRadarId);}}>Target {index+1}</button>)}
-              <button type="button" role="tab" aria-selected={targetInfoTab==="multiple"} className={targetInfoTab==="multiple"?"active":""} onClick={()=>setTargetInfoTab("multiple")}>Multiple</button>
-            </div>
-            {targetInfoTab==="multiple" || !selectedInfoRow ? <div className="target-info-table-wrap"><table className="target-info-table target-info-multiple-table"><thead><tr><th>TGT</th>{arpaInfoRows.slice(0,5).map((row,index)=><th key={row.track.targetId}><button type="button" className={selectedRadarTargetId===row.track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(row.track.associatedRadarId);setTargetInfoTab(row.track.targetId);}}>Target {index+1}</button></th>)}</tr></thead><tbody>
-              {targetInfoMetricRows.map((metric)=><tr key={metric.label}><th>{metric.label}</th>{metric.values.slice(0,5).map((value,index)=><td key={arpaInfoRows[index].track.targetId} className={selectedRadarTargetId===arpaInfoRows[index].track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(arpaInfoRows[index].track.associatedRadarId);setTargetInfoTab(arpaInfoRows[index].track.targetId);}}>{value}</td>)}</tr>)}
-              {arpaInfoRows.length===0&&<tr><td colSpan={6} className="target-info-empty">NO ARPA TARGETS · ACQUIRE A RADAR ECHO</td></tr>}
-            </tbody></table></div> : <div className="target-info-single"><div className="target-info-single-heading"><b>{selectedInfoRow.track.targetId}</b><span>{selectedInfoRow.track.status.toUpperCase()} · SRC ARPA</span><button type="button" onClick={()=>releaseTarget(selectedInfoRow.track.targetId)}>CANCEL</button></div>
-              <div className="target-info-metrics">{[
-                ["CPA",selectedInfoRow.solution.dcpaNm===null?"—":selectedInfoRow.solution.dcpaNm.toFixed(2),"NM"],
-                ["TCPA",formatMinutes(selectedInfoRow.solution.tcpaMin),""],["BRG",selectedInfoRow.solution.bearingDeg.toFixed(1),"°T"],["RNG",selectedInfoRow.solution.rangeNm.toFixed(2),"NM"],
-                ["COG",selectedInfoRow.track.estimatedCourseDeg===null?"—":selectedInfoRow.track.estimatedCourseDeg.toFixed(1),"°T"],["SOG",selectedInfoRow.track.estimatedSpeedKn===null?"—":selectedInfoRow.track.estimatedSpeedKn.toFixed(1),"kn"],
-                ["BCR",selectedInfoRow.bow.bcrNm===null?"—":selectedInfoRow.bow.bcrNm.toFixed(2),"NM"],["BCT",formatMinutes(selectedInfoRow.bow.bctMin),""],
-              ].map(([label,value,unit])=><div key={label}><small>{label}</small><b>{value}</b><em>{unit}</em></div>)}</div></div>}
+            <div className="target-info-titlebar"><span>Targets Information</span><button type="button" className="target-info-menu-trigger" aria-expanded={targetInfoMenuOpen} onClick={() => setTargetInfoMenuOpen((open) => !open)}>▼</button><small>{arpaInfoRows.length} TRACKED</small></div>
+            {targetInfoMenuOpen && <div className="target-info-menu" role="menu">
+              {[
+                ["overview","Targets overview"],["cpa","CPA / TCPA"],["bow","BCR / BCT"],["history","Past positions"],["tracking","ARPA tracking"],["trial","Trial manoeuvre"],["ais","AIS data · unavailable"],
+              ].map(([page,label])=><button type="button" role="menuitem" key={page} disabled={page==="ais"} className={targetInfoPage===page?"active":""} onClick={()=>{setTargetInfoPage(page);setTargetInfoMenuOpen(false);}}>{label}</button>)}
+            </div>}
+            {targetInfoPage==="overview" ? <>
+              <div className="target-info-tabs" role="tablist" aria-label="Отображение целей">
+                {arpaInfoRows.slice(0,6).map((row,index)=><button type="button" role="tab" aria-selected={targetInfoTab===row.track.targetId} className={targetInfoTab===row.track.targetId?"active":""} key={row.track.targetId} onClick={()=>{setTargetInfoTab(row.track.targetId);setSelectedRadarTargetId(row.track.associatedRadarId);}}>Target {index+1}</button>)}
+                <button type="button" role="tab" aria-selected={targetInfoTab==="multiple"} className={targetInfoTab==="multiple"?"active":""} onClick={()=>setTargetInfoTab("multiple")}>Multiple</button>
+              </div>
+              {targetInfoTab==="multiple" || !selectedInfoRow ? <div className="target-info-table-wrap"><table className="target-info-table target-info-multiple-table"><thead><tr><th>TGT</th>{arpaInfoRows.slice(0,5).map((row,index)=><th key={row.track.targetId}><button type="button" className={selectedRadarTargetId===row.track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(row.track.associatedRadarId);setTargetInfoTab(row.track.targetId);}}>Target {index+1}</button></th>)}</tr></thead><tbody>
+                {targetInfoMetricRows.map((metric)=><tr key={metric.label}><th>{metric.label}</th>{metric.values.slice(0,5).map((value,index)=><td key={arpaInfoRows[index].track.targetId} className={selectedRadarTargetId===arpaInfoRows[index].track.associatedRadarId?"selected":""} onClick={()=>{setSelectedRadarTargetId(arpaInfoRows[index].track.associatedRadarId);setTargetInfoTab(arpaInfoRows[index].track.targetId);}}>{value}</td>)}</tr>)}
+                {arpaInfoRows.length===0&&<tr><td colSpan={6} className="target-info-empty">NO ARPA TARGETS · ACQUIRE A RADAR ECHO</td></tr>}
+              </tbody></table></div> : <div className="target-info-single"><div className="target-info-single-heading"><b>{selectedInfoRow.track.targetId}</b><span>{selectedInfoRow.track.status.toUpperCase()} · SRC ARPA</span><button type="button" onClick={() => releaseTarget(selectedInfoRow.track.targetId)}>CANCEL</button></div>
+                <div className="target-info-metrics">{[
+                  ["CPA",selectedInfoRow.solution.dcpaNm===null?"—":selectedInfoRow.solution.dcpaNm.toFixed(2),"NM"],
+                  ["TCPA",formatMinutes(selectedInfoRow.solution.tcpaMin),""],["BRG",selectedInfoRow.solution.bearingDeg.toFixed(1),"°T"],["RNG",selectedInfoRow.solution.rangeNm.toFixed(2),"NM"],
+                  ["COG",selectedInfoRow.track.estimatedCourseDeg===null?"—":selectedInfoRow.track.estimatedCourseDeg.toFixed(1),"°T"],["SOG",selectedInfoRow.track.estimatedSpeedKn===null?"—":selectedInfoRow.track.estimatedSpeedKn.toFixed(1),"kn"],
+                  ["BCR",selectedInfoRow.bow.bcrNm===null?"—":selectedInfoRow.bow.bcrNm.toFixed(2),"NM"],["BCT",formatMinutes(selectedInfoRow.bow.bctMin),""],
+                ].map(([label,value,unit])=><div key={label}><small>{label}</small><b>{value}</b><em>{unit}</em></div>)}</div></div>}
+            </> : targetInfoPage==="cpa" ? <div className="target-info-detail"><h3>CPA / TCPA · {selectedInfoRow?.track.targetId ?? "NO TARGET"}</h3>{selectedInfoRow ? <div className="target-info-metrics"><div><small>DCPA</small><b>{selectedInfoRow.solution.dcpaNm?.toFixed(2) ?? "—"}</b><em>NM</em></div><div><small>TCPA</small><b>{formatMinutes(selectedInfoRow.solution.tcpaMin)}</b></div><div><small>RANGE</small><b>{selectedInfoRow.solution.rangeNm.toFixed(2)}</b><em>NM</em></div><div><small>BEARING</small><b>{selectedInfoRow.solution.bearingDeg.toFixed(1)}</b><em>°T</em></div></div> : <p>Захватите отметку в ARPA.</p>}</div>
+            : targetInfoPage==="bow" ? <div className="target-info-detail"><h3>BOW CROSSING · {selectedInfoRow?.track.targetId ?? "NO TARGET"}</h3>{selectedInfoRow ? <div className="target-info-metrics"><div><small>BCR</small><b>{selectedInfoRow.bow.bcrNm?.toFixed(2) ?? "—"}</b><em>NM</em></div><div><small>BCT</small><b>{formatMinutes(selectedInfoRow.bow.bctMin)}</b></div></div> : <p>Захватите и дождитесь TRACK.</p>}</div>
+            : targetInfoPage==="history" ? <div className="target-info-detail"><h3>PAST POSITIONS · {selectedInfoRow?.track.targetId ?? "NO TARGET"}</h3>{selectedInfoRow ? <table className="target-info-table"><thead><tr><th>TIME</th><th>RANGE</th><th>BEARING</th></tr></thead><tbody>{selectedInfoRow.track.measurements.slice().reverse().map((sample,index)=>{const dx=sample.xNm-ownVessel.xNm,dy=sample.yNm-ownVessel.yNm;return <tr key={sample.timeSeconds+"-"+index}><td>{formatTime(sample.timeSeconds)}</td><td>{Math.hypot(dx,dy).toFixed(2)} NM</td><td>{((Math.atan2(dx,dy)*180/Math.PI+360)%360).toFixed(1)}°T</td></tr>;})}</tbody></table> : <p>Выберите ARPA-цель.</p>}</div>
+            : targetInfoPage==="tracking" ? <div className="target-info-detail"><h3>ARPA TRACK STATUS</h3>{arpaInfoRows.map(row=><button type="button" className="target-info-track-row" key={row.track.targetId} onClick={()=>{setTargetInfoTab(row.track.targetId);setSelectedRadarTargetId(row.track.associatedRadarId);}}><b>{row.track.targetId}</b><span>{row.track.status.toUpperCase()}</span><span>{row.track.measurementsUsed} SCANS</span></button>)}</div>
+            : <div className="target-info-detail"><h3>TRIAL MANOEUVRE · {selectedInfoRow?.track.targetId ?? "SELECT TARGET"}</h3>
+              <div className="trial-controls trial-controls-compact">
+                <label>SET CSE °T<input type="number" min="0" max="359" value={trialCourseDeg} onChange={e=>setTrialCourseDeg(Math.max(0,Math.min(359,Number(e.target.value)||0)))}/></label>
+                <label>SET SPD kn<input type="number" min="0" max="30" step="0.5" value={trialSpeedKn} onChange={e=>setTrialSpeedKn(Math.max(0,Math.min(30,Number(e.target.value)||0)))}/></label>
+                <label>DELAY min<input type="number" min="0" max="30" step="0.5" value={trialDelayMin} onChange={e=>setTrialDelayMin(Math.max(0,Math.min(30,Number(e.target.value)||0)))}/></label>
+                <label>ROT °/min<input type="number" min="0.1" max="30" step="0.5" value={trialRotDegPerMin} onChange={e=>setTrialRotDegPerMin(Math.max(0.1,Math.min(30,Number(e.target.value)||0.1)))}/></label>
+                <label>ACC kn/min<input type="number" min="0" max="5" step="0.1" value={trialAcceleration} onChange={e=>setTrialAcceleration(Math.max(0,Math.min(5,Number(e.target.value)||0)))}/></label>
+                <label>DEC kn/min<input type="number" min="0" max="5" step="0.1" value={trialDeceleration} onChange={e=>setTrialDeceleration(Math.max(0,Math.min(5,Number(e.target.value)||0)))}/></label>
+                <label>VECTOR min<input type="number" min="1" max="120" value={trialHorizonMin} onChange={e=>setTrialHorizonMin(Math.max(1,Math.min(120,Number(e.target.value)||1)))}/></label>
+              </div>
+              {selectedTrialSolution && <div className="target-info-metrics"><div><small>TRIAL CPA</small><b>{selectedTrialSolution.dcpaNm?.toFixed(2) ?? "—"}</b><em>NM</em></div><div><small>TRIAL TCPA</small><b>{formatMinutes(selectedTrialSolution.tcpaMin)}</b></div></div>}
+              <p className="cpa-note">Прогноз учитывает задержку, поворот с постоянным ROT и темп изменения скорости. Все сопровождаемые цели продолжают обновляться; реальное движение собственного судна не меняется.</p>
+            </div>}
             <div className="target-info-foot"><span>CPA/TCPA · BCR/BCT</span><span>BEARING: TRUE</span><span>SOURCE: RADAR MEASUREMENTS</span></div>
           </section>
           <section className="panel console-panel">
@@ -789,7 +825,7 @@ export default function App() {
             const latestMeasurement = radarMeasurements.find((item) => item.id === track.associatedRadarId) ??
               (track.measurements.length ? track.measurements[track.measurements.length - 1] : null);
             const solution = latestMeasurement ? calculateArpaSolution(track, latestMeasurement, ownVessel) : null;
-            const trialSolution = latestMeasurement ? calculateTrialManoeuvre(track, latestMeasurement, ownVessel, { courseDeg: trialCourseDeg, speedKn: trialSpeedKn }) : null;
+            const trialSolution = latestMeasurement ? calculateDynamicTrialManoeuvre(track, latestMeasurement, ownVessel, { courseDeg: trialCourseDeg, speedKn: trialSpeedKn, delayMin: trialDelayMin, turnRateDegPerMin: trialRotDegPerMin, accelerationKnPerMin: trialAcceleration, decelerationKnPerMin: trialDeceleration, horizonMin: trialHorizonMin }) : null;
             const closeApproachAlert = solution ? isArpaCloseApproachAlert(track, solution, { minimumDcpaNm: alertDcpaNm, maximumTcpaMinutes: alertTcpaMinutes }) : false;
             const statusLabel = track.status === "acquiring" ? "Захват" : track.status === "tracking" ? "Сопровождение" : "Lost";
             return <tr key={track.targetId}>
