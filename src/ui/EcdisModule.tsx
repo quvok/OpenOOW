@@ -186,12 +186,21 @@ ${points}
   };
 
   const importChartGeoJson = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
     try {
-      const parsed: unknown = JSON.parse(await file.text());
-      const chart = importGeoJsonChart(parsed, origin, file.name);
-      setChartSource({ data: parsed, name: file.name });
+      const collections = await Promise.all(files.map(async (file) => {
+        const parsed: unknown = JSON.parse(await file.text());
+        if (!parsed || typeof parsed !== "object" || (parsed as { type?: unknown }).type !== "FeatureCollection" ||
+            !Array.isArray((parsed as { features?: unknown }).features)) {
+          throw new Error(file.name + ": ожидается GeoJSON FeatureCollection");
+        }
+        return (parsed as { features: unknown[] }).features;
+      }));
+      const merged = { type: "FeatureCollection", features: collections.flat() };
+      const chartName = files.map((file) => file.name).join(", ");
+      const chart = importGeoJsonChart(merged, origin, chartName);
+      setChartSource({ data: merged, name: chartName });
       setStatusMessage(`Карта загружена: ${chart.featureCount} объектов; площади ${chart.areas.length}, опасности ${chart.hazards.length}, изобаты ${chart.contours.length}, промеры ${chart.soundings.length}.`);
     } catch (error) {
       setStatusMessage("Ошибка загрузки карты: " + (error instanceof Error ? error.message : "неизвестная ошибка"));
@@ -259,11 +268,11 @@ ${points}
           <text x="20" y="27" className="ecdis-map-readout">OWN SHIP · {ship.headingDeg.toFixed(0)}°T</text>
           <text x="20" y="42" className="ecdis-map-readout">{ship.speedKn.toFixed(1)} kn · {formatCoordinate(geoOwn.latitudeDeg,true)}</text>
           <rect x="10" y={HEIGHT-37} width="225" height="27" className="ecdis-map-readout-bg"/>
-          <text x="20" y={HEIGHT-19} className="ecdis-map-readout">{formatCoordinate(geoOwn.longitudeDeg,false)} · LOCAL DATUM</text>
+          <text x="20" y={HEIGHT-19} className="ecdis-map-readout">{formatCoordinate(geoOwn.longitudeDeg,false)} · WGS-84</text>
         </svg>
         <div className="ecdis-map-legend"><span><i className="ecdis-legend-own"/>Своё судно</span><span><i className="ecdis-legend-target"/>Цель</span><span><i className="ecdis-legend-route"/>Маршрут</span><span><i className="ecdis-legend-danger"/>Опасность</span><span><i className="ecdis-legend-shallow"/>Малая глубина</span></div>
         <div className="ecdis-map-actions">
-          <button type="button" className="ecdis-tool" onClick={() => chartFileInput.current?.click()}>ЗАГРУЗИТЬ GEOJSON</button>{importedChart && <button type="button" className="ecdis-tool" onClick={() => {setChartSource(null);setStatusMessage("Возвращена учебная карта.");}}>УЧЕБНАЯ КАРТА</button>}<input ref={chartFileInput} type="file" accept=".geojson,.json,application/geo+json,application/json" hidden onChange={importChartGeoJson}/>
+          <button type="button" className="ecdis-tool" onClick={() => chartFileInput.current?.click()}>ЗАГРУЗИТЬ GEOJSON</button>{importedChart && <button type="button" className="ecdis-tool" onClick={() => {setChartSource(null);setStatusMessage("Возвращена учебная карта.");}}>УЧЕБНАЯ КАРТА</button>}<input ref={chartFileInput} type="file" accept=".geojson,.json,application/geo+json,application/json" multiple hidden onChange={importChartGeoJson}/>
           <button type="button" className="ecdis-tool" onClick={() => setHeadUp((value)=>!value)}>{headUp ? "HEAD UP" : "NORTH UP"}</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.min(1.6,Number((value+0.1).toFixed(1))))}>УВЕЛИЧИТЬ</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.max(0.7,Number((value-0.1).toFixed(1))))}>УМЕНЬШИТЬ</button>
