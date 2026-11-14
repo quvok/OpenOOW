@@ -15,7 +15,7 @@ describe("ARPA acquisition and tracking", () => {
 
   it("estimates a southbound target from successive positions, not declared course/speed", () => {
     let tracks: ArpaTrackSet = { T1: acquireArpaTarget(target, 0) };
-    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 5 }], 2.5);
+    tracks = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 - 5 / 3600 * 2.5 }], 2.5);
     expect(tracks.T1.status).toBe("tracking");
     expect(tracks.T1.estimatedCourseDeg).toBeCloseTo(180);
     expect(tracks.T1.estimatedSpeedKn).toBeCloseTo(5);
@@ -44,7 +44,7 @@ describe("ARPA acquisition and tracking", () => {
 
   it("does not append a duplicate measurement at the same scan time", () => {
     const tracks = { T1: acquireArpaTarget(target, 0) };
-    const next = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 }], 0.1);
+    const next = updateArpaTracks(tracks, [{ id: "T1", xNm: 0, yNm: 2 }], 0);
     expect(next).toBe(tracks);
   });
 
