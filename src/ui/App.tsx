@@ -229,7 +229,7 @@ export default function App() {
       <header className="topbar transas-topbar">
         <div className="equipment-brand"><span className="equipment-mark">O</span><div><b>OPENOOW</b><small>RADAR / ARPA SIMULATOR</small></div></div>
         <div className="equipment-title"><strong>RADAR</strong><span>{activeScenario.title}</span></div>
-        <div className={running ? "status live" : "status"}><i/>{running ? "TRANSMITTING" : "STANDBY"}</div>
+        <div className={running ? "status live" : "status"}><i/>{running ? "SIM RUNNING" : "SIM PAUSED"}</div>
       </header>
       <div className="instrument-strip">
         <span><small>HDG</small><b>{ship.headingDeg.toFixed(0)}°T</b></span>
@@ -388,9 +388,10 @@ export default function App() {
         </div>
       </div>
       <div className="instrument-footer">
-        <span className={running ? "tx-indicator active" : "tx-indicator"}>{running ? "TX ON" : "TX OFF"}</span>
-        <span>SEA: AUTO</span><span>RAIN: OFF</span><span>GAIN: 75%</span><span>IR: OFF</span>
-        <span className="footer-spacer"></span><span>OPENOOW TRAINING EQUIPMENT</span>
+        <span className={running ? "tx-indicator active" : "tx-indicator"}>{running ? "SIM ACTIVE" : "SIM PAUSED"}</span>
+        <span>EBL: {eblBearingDeg.toFixed(0)}°T</span><span>VRM: {vrmRangeNm.toFixed(1)} NM</span>
+        <span>VECTOR: {vectorMode.toUpperCase()}</span><span>ARPA: {Object.keys(arpaTracks).length} TRACKS</span>
+        <span className="footer-spacer"></span><span>TRAINING DISPLAY</span>
       </div>
       <section className="panel cpa-panel">
         <div className="panel-heading"><div><span className="eyebrow">РАСЧЁТ В РЕАЛЬНОМ ВРЕМЕНИ</span><h2>Геометрическая оценка без захвата</h2></div><Target size={18}/></div>
