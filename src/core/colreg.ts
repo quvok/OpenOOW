@@ -15,7 +15,7 @@ export type EncounterType =
   | "vessel-priority"
   | "uncertain";
 
-export type ColregResponsibility = "give-way" | "stand-on" | "both-act" | "no-specific-duty" | "undetermined";
+export type ColregResponsibility = "give-way" | "stand-on" | "both-act" | "no-impede" | "no-specific-duty" | "undetermined";
 export type Tack = "port" | "starboard" | "unknown";
 
 export interface ColregVesselProfile {
@@ -315,6 +315,16 @@ export function assessColregEncounter(
   const radarTrend = assessRadarTrend(environment.bearingHistoryDeg, environment.rangeHistoryNm);
   const collisionRisk: ColregAssessment["collisionRisk"] = radarTrend.rule7RiskIndication ? "risk" : cpaRisk;
   const hasRisk = collisionRisk === "risk";
+  const ownSmallOrSailing = (ownProfile.lengthM ?? 50) < 20 ||
+    (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower);
+  const ownFishingEngaged = ownProfile.kind === "fishing" && ownProfile.engagedInFishing === true;
+  const rule9MustNotImpede = environment.narrowChannel && (
+    ownSmallOrSailing && environment.targetCanOnlyNavigateChannel === true ||
+    ownFishingEngaged && environment.targetNavigatingChannel === true
+  );
+  const rule10MustNotImpede = environment.trafficSeparationScheme && environment.targetFollowingTrafficLane === true && (
+    ownFishingEngaged || ownSmallOrSailing && isPowerDriven(targetProfile)
+  );
 
   const applicableRules = generalDuties.map((item) => item.rule === 7 && radarTrend.rule7RiskIndication
     ? { ...item, duty: "Постоянный пеленг при уменьшающейся дистанции по последним радиолокационным измерениям указывает на возможную опасность. Не полагайтесь на один признак: продолжайте систематическую прокладку и оценку всеми доступными средствами." }
@@ -332,23 +342,6 @@ export function assessColregEncounter(
       duty: "Держитесь ближе к правой внешней границе фарватера, насколько это безопасно и практически возможно. Не затрудняйте проход судну, которое может безопасно идти только в пределах канала; пересекайте канал только если не создаёте помех. Обгоняйте в узком проходе только при безопасной возможности и согласии обгоняемого, используя сигналы правила 34. По возможности избегайте постановки на якорь в узком проходе.",
       status: "applies",
     });
-    if (((ownProfile.lengthM ?? 50) < 20 || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower)) &&
-        environment.targetCanOnlyNavigateChannel) {
-      addDuty(applicableRules, {
-        rule: 9,
-        title: "Малое судно / парусное",
-        duty: "Ваше судно не должно затруднять проход судна, которое может безопасно идти только в узком проходе или фарватере.",
-        status: "conditional",
-      });
-    }
-    if (ownProfile.kind === "fishing" && ownProfile.engagedInFishing && environment.targetNavigatingChannel) {
-      addDuty(applicableRules, {
-        rule: 9,
-        title: "Рыболовное судно в узком проходе",
-        duty: "Судно, занятое ловом рыбы, не должно затруднять проход любого другого судна, следующего в узком проходе или фарватере.",
-        status: "conditional",
-      });
-    }
   }
   if (environment.trafficSeparationScheme) {
     addDuty(applicableRules, {
@@ -364,9 +357,6 @@ export function assessColregEncounter(
         duty: "Пересекайте полосу по возможности под прямым углом к общему направлению потока, а не под малым углом.",
         status: "conditional",
       });
-    }
-    if (environment.targetFollowingTrafficLane && ((ownProfile.kind === "fishing" && ownProfile.engagedInFishing) || (ownProfile.kind === "sailing" && !ownProfile.underSailAndPower) || (ownProfile.lengthM ?? 50) < 20)) {
-      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе движения", duty: "Не затрудняйте безопасный проход механического судна, следующего по полосе движения TSS; для рыболовных судов это требование также применяется.", status: "conditional" });
     }
     if (environment.ownInshoreTrafficZone) {
       const inshoreExceptionCategory = (ownProfile.lengthM ?? 50) < 20 ||
@@ -487,26 +477,58 @@ export function assessColregEncounter(
       }
     }
 
-    if (primaryRule !== null && primaryRule >= 12 && primaryRule <= 18) {
-      addDuty(applicableRules, {
-        rule: primaryRule,
-        title: primaryRule === 12 ? "Парусные суда" : primaryRule === 13 ? "Обгон" : primaryRule === 14 ? "Встречное сближение" : primaryRule === 15 ? "Пересечение курсов" : "Взаимные обязанности судов",
-        duty: ownShipDuty,
-        status: "applies",
-      });
-    }
-
-    if (primaryRule === 13 || primaryRule === 15 || primaryRule === 18 || primaryRule === 12) {
-      if (responsibility === "give-way") {
-        applicableRules.push({ rule: 16, title: "Судно, уступающее дорогу", duty: "Предпринимайте заблаговременное и решительное действие, чтобы чисто разойтись; по возможности избегайте пересечения курса другого судна перед его носом.", status: "applies" });
-      } else if (responsibility === "stand-on") {
-        applicableRules.push({ rule: 17, title: "Судно, сохраняющее курс и скорость", duty: "Сохраняйте курс и скорость. Когда становится очевидно, что уступающее судно не действует должным образом, можете действовать самостоятельно; когда столкновения нельзя избежать только его действиями, обязаны предпринять наиболее эффективное действие.", status: "applies" });
-      }
-    }
   } else {
     ownShipDuty = environment.visibility === "restricted"
       ? "Суда не находятся на виду друг у друга: проверьте применимость правила 19 и используйте радарную информацию."
       : "Правила 11–18 для судов на виду пока не применяются: цель не подтверждена визуально. Продолжайте оценку по правилам 4–10.";
+  }
+
+  if (rule9MustNotImpede || rule10MustNotImpede) {
+    const nonImpedimentDuties: string[] = [];
+    if (rule9MustNotImpede) {
+      const duty = ownFishingEngaged
+        ? "По правилу 9(c) рыболовное судно не должно затруднять проход любого другого судна, следующего в узком проходе."
+        : "По правилу 9(b) малое или парусное судно не должно затруднять проход судна, способного безопасно идти только в пределах узкого прохода.";
+      nonImpedimentDuties.push(duty);
+      addDuty(applicableRules, { rule: 9, title: "Не затруднять проход в узком канале", duty, status: "conditional" });
+    }
+    if (rule10MustNotImpede) {
+      const duty = ownFishingEngaged
+        ? "По правилу 10(j) рыболовное судно не должно затруднять безопасный проход любого судна, следующего по полосе TSS."
+        : "По правилу 10(j) судно менее 20 м или парусное судно не должно затруднять безопасный проход механического судна, следующего по полосе TSS.";
+      nonImpedimentDuties.push(duty);
+      addDuty(applicableRules, { rule: 10, title: "Не затруднять судно в полосе TSS", duty, status: "conditional" });
+    }
+    const combinedDuty = nonImpedimentDuties.join(" ");
+    if (primaryRule === null) {
+      primaryRule = rule9MustNotImpede ? 9 : 10;
+      encounter = "vessel-priority";
+      title = rule9MustNotImpede ? "Узкий проход: обязанность не затруднять" : "TSS: обязанность не затруднять";
+      ownShipDuty = combinedDuty;
+      responsibility = "no-impede";
+    } else if (responsibility === "stand-on" || responsibility === "undetermined" || responsibility === "no-specific-duty") {
+      ownShipDuty = combinedDuty + " Геометрическая оценка могла бы указывать на сохранение курса, но специальная обязанность не затруднять проход имеет приоритет.";
+      responsibility = "no-impede";
+    } else {
+      ownShipDuty += " Дополнительно: " + combinedDuty;
+    }
+  }
+
+  if (primaryRule !== null && primaryRule >= 12 && primaryRule <= 18) {
+    addDuty(applicableRules, {
+      rule: primaryRule,
+      title: primaryRule === 12 ? "Парусные суда" : primaryRule === 13 ? "Обгон" : primaryRule === 14 ? "Встречное сближение" : primaryRule === 15 ? "Пересечение курсов" : "Взаимные обязанности судов",
+      duty: ownShipDuty,
+      status: "applies",
+    });
+  }
+
+  if (primaryRule === 13 || primaryRule === 15 || primaryRule === 18 || primaryRule === 12) {
+    if (responsibility === "give-way") {
+      applicableRules.push({ rule: 16, title: "Судно, уступающее дорогу", duty: "Предпринимайте заблаговременное и решительное действие, чтобы чисто разойтись; по возможности избегайте пересечения курса другого судна перед его носом.", status: "applies" });
+    } else if (responsibility === "stand-on") {
+      applicableRules.push({ rule: 17, title: "Судно, сохраняющее курс и скорость", duty: "Сохраняйте курс и скорость. Когда становится очевидно, что уступающее судно не действует должным образом, можете действовать самостоятельно; когда столкновения нельзя избежать только его действиями, обязаны предпринять наиболее эффективное действие.", status: "applies" });
+    }
   }
 
   if (environment.daylight === false) {
