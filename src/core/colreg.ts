@@ -15,7 +15,7 @@ export type EncounterType =
   | "vessel-priority"
   | "uncertain";
 
-export type ColregResponsibility = "give-way" | "stand-on" | "no-specific-duty" | "undetermined";
+export type ColregResponsibility = "give-way" | "stand-on" | "both-act" | "no-specific-duty" | "undetermined";
 export type Tack = "port" | "starboard" | "unknown";
 
 export interface ColregVesselProfile {
@@ -441,8 +441,8 @@ export function assessColregEncounter(
         encounter = "head-on";
         primaryRule = 14;
         title = "Вероятная ситуация встречного сближения";
-        responsibility = "give-way";
-        ownShipDuty = "Правило 14: если действительно наблюдается встречное или почти встречное сближение двух механических судов, измените курс вправо, чтобы пройти левыми бортами. При сомнении считайте ситуацию встречной.";
+        responsibility = "both-act";
+        ownShipDuty = "Правило 14: оба механических судна должны изменить курс вправо, чтобы пройти левыми бортами. Это взаимная обязанность обоих судов, а не обычная пара «уступающее/сохраняющее курс». При сомнении считайте ситуацию встречной.";
       } else if (isPowerDriven(ownProfile) && isPowerDriven(targetProfile) &&
                  hasRisk && isForwardSector(ownRelativeBearing) &&
                  ownRelativeBearing > 0 && ownRelativeBearing < 112.5) {
@@ -473,7 +473,7 @@ export function assessColregEncounter(
       }
     }
 
-    if (primaryRule === 13 || primaryRule === 14 || primaryRule === 15 || primaryRule === 18 || primaryRule === 12) {
+    if (primaryRule === 13 || primaryRule === 15 || primaryRule === 18 || primaryRule === 12) {
       if (responsibility === "give-way") {
         applicableRules.push({ rule: 16, title: "Судно, уступающее дорогу", duty: "Предпринимайте заблаговременное и решительное действие, чтобы чисто разойтись; по возможности избегайте пересечения курса другого судна перед его носом.", status: "applies" });
       } else if (responsibility === "stand-on") {
