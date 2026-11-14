@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Anchor, Gauge, RotateCcw, Ship, Waves, Target } from "lucide-react";
 import { advanceFixedSteps } from "../core/simulationEngine";
-import { advanceVessel, calculateCpa, type VesselState } from "../core/navigation";
+import { advanceVessel, calculateCpa, velocityFromCourse, type VesselState } from "../core/navigation";
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarMeasurementTrackHistory, recordRadarMeasurementTracks } from "../core/radarTracks";
 import { acquireArpaTarget, calculateArpaSolution, calculateTrialManoeuvre, updateArpaTracks, isArpaCloseApproachAlert, DEFAULT_ARPA_ALERT_CONFIG, DEFAULT_ARPA_LOST_AFTER_SECONDS, type ArpaTrackSet } from "../core/arpa";
@@ -305,11 +305,24 @@ export default function App() {
   const targetCpa = targets.map((target) => ({ target, cpa: calculateCpa(ownVessel, target) }));
   const selectedMeasurement = radarMeasurements.find((item) => item.id === selectedRadarTargetId) ?? null;
   const selectedTrack = selectedRadarTargetId ? Object.values(arpaTracks).find((track) => track.associatedRadarId === selectedRadarTargetId) ?? arpaTracks[selectedRadarTargetId] : undefined;
-  const latestColregMeasurement = selectedTrack?.measurements[selectedTrack.measurements.length - 1];
   const selectedColregHistory = selectedTrack ? tracks[selectedTrack.associatedRadarId] ?? [] : [];
+  const latestColregRelativeSample = selectedColregHistory[selectedColregHistory.length - 1];
   const selectedColregTarget: VesselState | null = selectedTrack?.status === "tracking" &&
-    selectedTrack.estimatedCourseDeg !== null && selectedTrack.estimatedSpeedKn !== null && latestColregMeasurement
-    ? { id: selectedTrack.targetId, xNm: latestColregMeasurement.xNm, yNm: latestColregMeasurement.yNm, courseDeg: selectedTrack.estimatedCourseDeg, speedKn: selectedTrack.estimatedSpeedKn }
+    selectedTrack.estimatedCourseDeg !== null && selectedTrack.estimatedSpeedKn !== null && latestColregRelativeSample
+    ? (() => {
+        const targetVelocity = velocityFromCourse(selectedTrack.estimatedCourseDeg, selectedTrack.estimatedSpeedKn);
+        const ownVelocity = velocityFromCourse(ownVessel.courseDeg, ownVessel.speedKn);
+        const measurementAgeHours = Math.max(0, (ship.elapsedSeconds - latestColregRelativeSample.timeSeconds) / 3600);
+        const relativeEastNow = latestColregRelativeSample.xNm + (targetVelocity.eastKn - ownVelocity.eastKn) * measurementAgeHours;
+        const relativeNorthNow = latestColregRelativeSample.yNm + (targetVelocity.northKn - ownVelocity.northKn) * measurementAgeHours;
+        return {
+          id: selectedTrack.targetId,
+          xNm: ownVessel.xNm + relativeEastNow,
+          yNm: ownVessel.yNm + relativeNorthNow,
+          courseDeg: selectedTrack.estimatedCourseDeg,
+          speedKn: selectedTrack.estimatedSpeedKn,
+        };
+      })()
     : null;
   const colregAssessment = selectedColregTarget
     ? assessColregEncounter(ownVessel, selectedColregTarget, {
