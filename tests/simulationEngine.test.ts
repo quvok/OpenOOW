@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { advanceFixedSteps } from "../src/core/simulationEngine";
+import { INITIAL_SHIP_STATE, stepShip } from "../src/core/shipDynamics";
 
 describe("fixed-step simulation engine", () => {
   const addStep = (state: number, dt: number) => state + dt;
@@ -36,6 +37,26 @@ describe("fixed-step simulation engine", () => {
     expect(result.stepsExecuted).toBe(3);
     expect(result.state).toBeCloseTo(0.3);
     expect(result.accumulatorSeconds).toBeCloseTo(0.7);
+  });
+
+  it("reproduces ship dynamics independently of frame-time chunking", () => {
+    const initial = { ...INITIAL_SHIP_STATE, throttlePercent: 75, rudderDeg: 20 };
+    const whole = advanceFixedSteps(initial, 1, 0, 0.1, stepShip);
+
+    let state = initial;
+    let accumulator = 0;
+    for (const elapsed of [0.16, 0.07, 0.31, 0.11, 0.35]) {
+      const result = advanceFixedSteps(state, elapsed, accumulator, 0.1, stepShip);
+      state = result.state;
+      accumulator = result.accumulatorSeconds;
+    }
+
+    expect(state.speedKn).toBeCloseTo(whole.state.speedKn, 10);
+    expect(state.headingDeg).toBeCloseTo(whole.state.headingDeg, 10);
+    expect(state.eastNm).toBeCloseTo(whole.state.eastNm, 10);
+    expect(state.northNm).toBeCloseTo(whole.state.northNm, 10);
+    expect(state.elapsedSeconds).toBeCloseTo(whole.state.elapsedSeconds, 10);
+    expect(accumulator).toBeCloseTo(whole.accumulatorSeconds, 10);
   });
 
   it("rejects invalid timing parameters", () => {
