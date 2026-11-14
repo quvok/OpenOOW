@@ -18,7 +18,7 @@ const own: VesselState = { id: "OWN", xNm: 0, yNm: 0, courseDeg: 0, speedKn: 10 
 
 describe("ARPA acquisition and tracking", () => {
   it("calculates signed bow crossing range and time", () => {
-    const track = { ...acquireArpaTarget({ id: "T1", xNm: 1, yNm: 2 }, 0), status: "tracking" as const, targetVelocityEastKn: -5, targetVelocityNorthKn: 0 };
+    const track = { ...acquireArpaTarget({ id: "T1", xNm: 1, yNm: 2 }, 0), status: "tracking" as const, targetVelocityEastKn: -5, targetVelocityNorthKn: 10 };
     const result = calculateBowCrossing(track, { xNm: 1, yNm: 2 }, own);
     expect(result.bctMin).toBeCloseTo(12);
     expect(result.bcrNm).toBeCloseTo(2);
