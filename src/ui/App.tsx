@@ -30,6 +30,7 @@ const COLREG_VESSEL_OPTIONS: Array<{ value: ColregVesselKind; label: string }> =
   { value: "anchored", label: "На якоре" },
   { value: "aground", label: "На мели" },
   { value: "seaplane", label: "Гидросамолёт" },
+  { value: "wig-craft", label: "WIG — судно на динамической воздушной подушке" },
   { value: "other", label: "Не определено" },
 ];
 
@@ -85,6 +86,8 @@ export default function App() {
   const [colregTargetFishing, setColregTargetFishing] = useState(false);
   const [colregOwnMotorUnderSail, setColregOwnMotorUnderSail] = useState(false);
   const [colregTargetMotorUnderSail, setColregTargetMotorUnderSail] = useState(false);
+  const [colregOwnWigOnSurface, setColregOwnWigOnSurface] = useState(false);
+  const [colregTargetWigOnSurface, setColregTargetWigOnSurface] = useState(false);
   const [colregOwnLengthM, setColregOwnLengthM] = useState(50);
   const [colregTargetLengthM, setColregTargetLengthM] = useState(50);
   const [colregOwnTack, setColregOwnTack] = useState<Tack>("unknown");
@@ -212,6 +215,8 @@ export default function App() {
     setColregTargetFishing(targetContext?.engagedInFishing ?? false);
     setColregOwnMotorUnderSail(ownContext?.underSailAndPower ?? false);
     setColregTargetMotorUnderSail(targetContext?.underSailAndPower ?? false);
+    setColregOwnWigOnSurface(ownContext?.wigOnSurface ?? false);
+    setColregTargetWigOnSurface(targetContext?.wigOnSurface ?? false);
     setColregOwnTack(ownContext?.tack ?? "unknown");
     setColregTargetTack(targetContext?.tack ?? "unknown");
     setColregOwnWindward(ownContext?.windward == null ? "unknown" : ownContext.windward ? "yes" : "no");
@@ -304,8 +309,8 @@ export default function App() {
     : null;
   const colregAssessment = selectedColregTarget
     ? assessColregEncounter(ownVessel, selectedColregTarget, {
-        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes", lengthM: colregOwnLengthM },
-        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes", lengthM: colregTargetLengthM },
+        ownProfile: { kind: colregOwnKind, engagedInFishing: colregOwnFishing, underSailAndPower: colregOwnMotorUnderSail, wigOnSurface: colregOwnWigOnSurface, tack: colregOwnTack, windward: colregOwnWindward === "unknown" ? null : colregOwnWindward === "yes", lengthM: colregOwnLengthM },
+        targetProfile: { kind: colregTargetKind, engagedInFishing: colregTargetFishing, underSailAndPower: colregTargetMotorUnderSail, wigOnSurface: colregTargetWigOnSurface, tack: colregTargetTack, windward: colregTargetWindward === "unknown" ? null : colregTargetWindward === "yes", lengthM: colregTargetLengthM },
         environment: { visibility: colregVisibility, vesselsInSight: colregVesselsInSight, daylight: colregDaylight, narrowChannel: colregNarrowChannel, trafficSeparationScheme: colregTss, ownCrossingTrafficLane: colregCrossingTss, targetFollowingTrafficLane: colregTargetFollowingLane, targetCanOnlyNavigateChannel: colregTargetChannelLimited, targetNavigatingChannel: colregTargetNavigatingChannel, ownInshoreTrafficZone: colregOwnInshoreZone, targetWindwardOfOwn: colregTargetWindwardOfOwn === "unknown" ? null : colregTargetWindwardOfOwn === "yes", ownOvertakingNotClear: colregOwnOvertakingNotClear, targetOvertakingNotClear: colregTargetOvertakingNotClear, bearingHistoryDeg: selectedColregHistory.slice(-8).map((sample) => (Math.atan2(sample.xNm, sample.yNm) * 180 / Math.PI + 360) % 360), rangeHistoryNm: selectedColregHistory.slice(-8).map((sample) => Math.hypot(sample.xNm, sample.yNm)), riskDcpaNm: alertDcpaNm },
       })
     : null;
@@ -495,6 +500,8 @@ export default function App() {
                 {colregOwnKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnFishing} onChange={(event) => setColregOwnFishing(event.target.checked)}/><span>Собственное судно занято ловом рыбы</span></label>}
                 {colregTargetKind === "fishing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetFishing} onChange={(event) => setColregTargetFishing(event.target.checked)}/><span>Цель занята ловом рыбы</span></label>}
                 {colregOwnKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregOwnMotorUnderSail} onChange={(event) => setColregOwnMotorUnderSail(event.target.checked)}/><span>Двигатель работает под парусами</span></label>}
+                {colregOwnKind === "wig-craft" && <label className="colreg-check"><input type="checkbox" checked={colregOwnWigOnSurface} onChange={(event) => setColregOwnWigOnSurface(event.target.checked)}/><span>Собственный WIG движется по поверхности воды</span></label>}
+                {colregTargetKind === "wig-craft" && <label className="colreg-check"><input type="checkbox" checked={colregTargetWigOnSurface} onChange={(event) => setColregTargetWigOnSurface(event.target.checked)}/><span>WIG-цель движется по поверхности воды</span></label>}
                 {colregTargetKind === "sailing" && <label className="colreg-check"><input type="checkbox" checked={colregTargetMotorUnderSail} onChange={(event) => setColregTargetMotorUnderSail(event.target.checked)}/><span>Двигатель цели работает под парусами</span></label>}
                 {colregOwnKind === "sailing" && !colregOwnMotorUnderSail && <label><span>Галс своего судна</span><select value={colregOwnTack} onChange={(event) => setColregOwnTack(event.target.value as Tack)}><option value="unknown">Не определён</option><option value="port">Левый галс</option><option value="starboard">Правый галс</option></select></label>}
                 {colregTargetKind === "sailing" && !colregTargetMotorUnderSail && <label><span>Галс цели</span><select value={colregTargetTack} onChange={(event) => setColregTargetTack(event.target.value as Tack)}><option value="unknown">Не определён</option><option value="port">Левый галс</option><option value="starboard">Правый галс</option></select></label>}
