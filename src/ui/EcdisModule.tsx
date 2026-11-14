@@ -55,7 +55,8 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);
   const routeFileInput = useRef<HTMLInputElement>(null);
   const chartFileInput = useRef<HTMLInputElement>(null);
-  const [importedChart, setImportedChart] = useState<ImportedChartData | null>(null);
+  const [chartSource, setChartSource] = useState<{ data: unknown; name: string } | null>(null);
+  const importedChart = useMemo(() => chartSource ? importGeoJsonChart(chartSource.data, origin, chartSource.name) : null, [chartSource, origin]);
   const chartAreas = importedChart ? importedChart.areas : TRAINING_CHART_AREAS;
   const chartHazards = importedChart ? importedChart.hazards : TRAINING_CHART_HAZARDS;
 
@@ -190,7 +191,7 @@ ${points}
     try {
       const parsed: unknown = JSON.parse(await file.text());
       const chart = importGeoJsonChart(parsed, origin, file.name);
-      setImportedChart(chart);
+      setChartSource({ data: parsed, name: file.name });
       setStatusMessage(`Карта загружена: ${chart.featureCount} объектов; площади ${chart.areas.length}, опасности ${chart.hazards.length}, изобаты ${chart.contours.length}, промеры ${chart.soundings.length}.`);
     } catch (error) {
       setStatusMessage("Ошибка загрузки карты: " + (error instanceof Error ? error.message : "неизвестная ошибка"));
@@ -262,7 +263,7 @@ ${points}
         </svg>
         <div className="ecdis-map-legend"><span><i className="ecdis-legend-own"/>Своё судно</span><span><i className="ecdis-legend-target"/>Цель</span><span><i className="ecdis-legend-route"/>Маршрут</span><span><i className="ecdis-legend-danger"/>Опасность</span><span><i className="ecdis-legend-shallow"/>Малая глубина</span></div>
         <div className="ecdis-map-actions">
-          <button type="button" className="ecdis-tool" onClick={() => chartFileInput.current?.click()}>ЗАГРУЗИТЬ GEOJSON</button>{importedChart && <button type="button" className="ecdis-tool" onClick={() => {setImportedChart(null);setStatusMessage("Возвращена учебная карта.");}}>УЧЕБНАЯ КАРТА</button>}<input ref={chartFileInput} type="file" accept=".geojson,.json,application/geo+json,application/json" hidden onChange={importChartGeoJson}/>
+          <button type="button" className="ecdis-tool" onClick={() => chartFileInput.current?.click()}>ЗАГРУЗИТЬ GEOJSON</button>{importedChart && <button type="button" className="ecdis-tool" onClick={() => {setChartSource(null);setStatusMessage("Возвращена учебная карта.");}}>УЧЕБНАЯ КАРТА</button>}<input ref={chartFileInput} type="file" accept=".geojson,.json,application/geo+json,application/json" hidden onChange={importChartGeoJson}/>
           <button type="button" className="ecdis-tool" onClick={() => setHeadUp((value)=>!value)}>{headUp ? "HEAD UP" : "NORTH UP"}</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.min(1.6,Number((value+0.1).toFixed(1))))}>УВЕЛИЧИТЬ</button>
           <button type="button" className="ecdis-tool" onClick={() => setChartScale((value)=>Math.max(0.7,Number((value-0.1).toFixed(1))))}>УМЕНЬШИТЬ</button>
