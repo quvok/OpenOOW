@@ -98,6 +98,7 @@ export default function EcdisModule({ ship, targets }: Props) {
   };
 
   const removeLastWaypoint = () => {
+    if (route.length <= 1) setRouteStart(null);
     setRoute((current) => current.slice(0, -1));
     setStatusMessage("Последняя маршрутная точка удалена.");
   };
@@ -287,7 +288,7 @@ export default function EcdisModule({ ship, targets }: Props) {
           {selectedWaypoint && <div className="ecdis-selected-waypoint"><b>{selectedWaypoint.name}</b>
             <label className="ecdis-setting"><span>E, NM</span><input type="number" step="0.001" value={selectedWaypoint.eastNm} onChange={(event)=>updateWaypoint(selectedWaypoint.id,"eastNm",event.target.value)}/></label>
             <label className="ecdis-setting"><span>N, NM</span><input type="number" step="0.001" value={selectedWaypoint.northNm} onChange={(event)=>updateWaypoint(selectedWaypoint.id,"northNm",event.target.value)}/></label>
-            <div className="ecdis-route-actions"><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,-1)}>ВЫШЕ</button><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,1)}>НИЖЕ</button><button type="button" className="ecdis-tool" onClick={()=>setRoute((current)=>current.filter((point)=>point.id!==selectedWaypoint.id).map((point,index)=>({...point,id:"WP-"+String(index+1).padStart(2,"0"),name:"WP "+String(index+1).padStart(2,"0")})))}>УДАЛИТЬ WP</button></div>
+            <div className="ecdis-route-actions"><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,-1)}>ВЫШЕ</button><button type="button" className="ecdis-tool" onClick={()=>moveWaypoint(selectedWaypoint.id,1)}>НИЖЕ</button><button type="button" className="ecdis-tool" onClick={()=>{if(route.length<=1)setRouteStart(null);setRoute((current)=>current.filter((point)=>point.id!==selectedWaypoint.id).map((point,index)=>({...point,id:"WP-"+String(index+1).padStart(2,"0"),name:"WP "+String(index+1).padStart(2,"0")})));}}>УДАЛИТЬ WP</button></div>
           </div>}
           {route.length > 2 && <div className="ecdis-selected-waypoint"><b>WHEEL-OVER ESTIMATE</b><span>ROT {plannedRotDegPerMin.toFixed(0)}°/min · SOG {ship.speedKn.toFixed(1)} kn</span>{route.slice(1, -1).map((point, index) => {
             const incoming = bearingDeg(route[index], point);
