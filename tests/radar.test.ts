@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { courseVectorToRadar, projectRelativePosition } from "../src/core/radar";
+import { courseVectorToRadar, motionVectorToRadar, projectRelativePosition } from "../src/core/radar";
 
 describe("radar projection", () => {
   const own = { xNm: 0, yNm: 0 };
@@ -38,5 +38,31 @@ describe("radar projection", () => {
     const vector = courseVectorToRadar(270, 10, 6, 3, 220);
     expect(vector.dx).toBeLessThan(0);
     expect(vector.dy).toBeCloseTo(0);
+  });
+});
+
+describe("true and relative radar vectors", () => {
+  it("keeps a target's true vector independent of own-ship motion", () => {
+    const own = { courseDeg: 90, speedKn: 10 };
+    const target = { courseDeg: 0, speedKn: 8 };
+    const vector = motionVectorToRadar(own, target, "true", 6, 3, 220);
+    expect(vector.dx).toBeCloseTo(0);
+    expect(vector.dy).toBeLessThan(0);
+  });
+
+  it("subtracts own-ship velocity in relative vector mode", () => {
+    const own = { courseDeg: 0, speedKn: 10 };
+    const target = { courseDeg: 0, speedKn: 8 };
+    const vector = motionVectorToRadar(own, target, "relative", 6, 3, 220);
+    expect(vector.dx).toBeCloseTo(0);
+    expect(vector.dy).toBeGreaterThan(0);
+  });
+
+  it("shows a stationary target moving astern in relative mode when own ship advances", () => {
+    const own = { courseDeg: 0, speedKn: 10 };
+    const target = { courseDeg: 90, speedKn: 0 };
+    const vector = motionVectorToRadar(own, target, "relative", 6, 3, 220);
+    expect(vector.dy).toBeGreaterThan(0);
+    expect(vector.dx).toBeCloseTo(0);
   });
 });
