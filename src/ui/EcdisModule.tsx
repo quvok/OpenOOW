@@ -52,7 +52,8 @@ export default function EcdisModule({ ship, targets }: Props) {
   const [safetyDepthM, setSafetyDepthM] = useState(8);
   const [safetyContourM, setSafetyContourM] = useState(10);
   const [shallowContourM, setShallowContourM] = useState(20);
-  const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);\n  const routeFileInput = useRef<HTMLInputElement>(null);
+  const [plannedRotDegPerMin, setPlannedRotDegPerMin] = useState(20);
+  const routeFileInput = useRef<HTMLInputElement>(null);
 
   const [statusMessage, setStatusMessage] = useState("Нажмите на карту, чтобы добавить первую маршрутную точку.");
   const ownPosition = { eastNm: ship.eastNm, northNm: ship.northNm };
@@ -134,8 +135,12 @@ export default function EcdisModule({ ship, targets }: Props) {
       const geo = toGeographicPosition(point, origin);
       const safeName = point.name.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("\'", "&apos;");
       return `    <rtept lat="${geo.latitudeDeg.toFixed(7)}" lon="${geo.longitudeDeg.toFixed(7)}"><name>${safeName}</name></rtept>`;
-    }).join("\n");
-    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="OpenOOW" xmlns="http://www.topografix.com/GPX/1/1"><rte><name>OpenOOW route</name>\n${points}\n</rte></gpx>`;
+    }).join("
+");
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="OpenOOW" xmlns="http://www.topografix.com/GPX/1/1"><rte><name>OpenOOW route</name>
+${points}
+</rte></gpx>`;
     const url = URL.createObjectURL(new Blob([xml], { type: "application/gpx+xml;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
