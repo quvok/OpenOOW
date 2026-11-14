@@ -33,7 +33,7 @@ describe("COLREG encounter assessment", () => {
 
   it("identifies overtaking from the target's stern sector when closing", () => {
     const result = assessColregEncounter(own(), {
-      id: "T1", xNm: 0, yNm: -1, courseDeg: 0, speedKn: 5,
+      id: "T1", xNm: 0, yNm: 1, courseDeg: 0, speedKn: 5,
     });
     expect(result.encounter).toBe("overtaking");
     expect(result.rule).toBe("13");
