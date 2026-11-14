@@ -264,3 +264,29 @@ input[type=range]{accent-color:#a6b58b}
  .dialog-backdrop{padding:8px}
  .scenario-dialog{padding:12px}
 }
+
+
+/* v0.17.0: live ARPA overview and accessible trial manoeuvre */
+.arpa-live-panel{min-height:120px}
+.arpa-live-list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.arpa-live-row{display:grid;grid-template-columns:minmax(45px,1fr) 42px 1fr 18px;align-items:center;gap:5px;width:100%;padding:7px 6px;text-align:left;border:1px solid #354032;background:#0d130d;color:#bac6b0;font:9px 'DM Mono',monospace;border-radius:1px}
+.arpa-live-row:hover,.arpa-live-row.selected{border-color:#9cac7d;background:#1b2618}
+.arpa-live-id{display:flex;flex-direction:column;color:#d8e1ce;font-weight:700}
+.arpa-live-id small{margin-top:2px;color:#84917a;font-size:7px;font-weight:400}
+.arpa-live-status{color:#9fac8d;font-size:8px}
+.arpa-live-cpa{display:flex;align-items:baseline;gap:3px;white-space:nowrap}
+.arpa-live-cpa b{font-size:11px;color:#d9e4ce}
+.arpa-live-cpa small{font-size:7px;color:#83917a}
+.arpa-live-alert{display:grid;place-items:center;width:15px;height:15px;border:1px solid #495342;color:#87917e}
+.arpa-live-alert.active{border-color:#c78a45;background:#5b3518;color:#ffd19a;font-weight:700}
+.arpa-threshold-line{margin-top:8px;padding-top:7px;border-top:1px solid #303a2e;color:#87947e;font:7px 'DM Mono',monospace;letter-spacing:.2px}
+.compact-note{margin:8px 0 0;font-size:9px;line-height:1.5}
+.trial-quick-panel .console-field input{width:92px;max-width:45%;padding:5px 6px;border:1px solid #46513f;background:#0b100b;color:#d6dfcc;font:10px 'DM Mono',monospace;text-align:right}
+.trial-reset{width:100%;margin-top:9px}
+@media(max-width:800px){
+ .radar-console .arpa-live-panel,.radar-console .trial-quick-panel{grid-column:2}
+}
+@media(max-width:560px){
+ .arpa-live-row{grid-template-columns:minmax(40px,1fr) 36px 1fr 16px;padding:6px 4px}
+ .arpa-live-cpa small{font-size:6px}
+}
