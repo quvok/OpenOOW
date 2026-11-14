@@ -38,3 +38,17 @@ The dynamic trial prediction is calculated independently of live ship state:
 5. Relative separation is evaluated at one-second intervals over the configured vector horizon. The minimum predicted separation and its time are reported as trial DCPA/TCPA.
 
 This is a deterministic educational model. It does not reproduce a specific manufacturer algorithm, vessel-specific manoeuvring booklet, rudder response, drift, current, wind, or turning-circle model. Trial results are not for real navigation.
+
+
+## Unified Targets Information panel (v0.23.1)
+
+The title-bar arrow expands or collapses one integrated information area. It does not navigate between separate pages. The expanded area stacks all target-data blocks in one continuous panel:
+- Target overview and multi-target table.
+- Selected-target CPA/TCPA and current bearing/range.
+- BCR/BCT.
+- Past measured positions.
+- ARPA tracking status for every acquired target.
+- Dynamic Trial Manoeuvre settings and predicted CPA/TCPA.
+- AIS availability status.
+
+Selecting a target in the overview or tracking list updates the selected-target-dependent blocks together. The panel uses Russian labels; standard maritime abbreviations and units are retained. All blocks are visible in the same expanded area.
