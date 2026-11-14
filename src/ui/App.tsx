@@ -5,6 +5,7 @@ import { advanceVessel, calculateCpa, type VesselState } from "../core/navigatio
 import { motionVectorToRadar, projectRelativePosition, type RadarVectorMode } from "../core/radar";
 import { createRadarTrackHistory, recordRadarTracks } from "../core/radarTracks";
 import { acquireArpaTarget, calculateArpaSolution, updateArpaTracks, type ArpaTrackSet } from "../core/arpa";
+import { DEFAULT_RADAR_CONFIG, isRadarScanDue, measureRadarContacts, type RadarScanClock } from "../core/radarMeasurements";
 import { INITIAL_SHIP_STATE, stepShip, type ShipDynamicsState } from "../core/shipDynamics";
 import { ENCOUNTER_SCENARIOS, getScenarioTargetCpa, type EncounterScenario } from "../core/scenarios";
 
@@ -52,10 +53,13 @@ export default function App() {
   const [targets, setTargets] = useState<VesselState[]>(() => ENCOUNTER_SCENARIOS[0].targets.map((target) => ({ ...target })));
   const [tracks, setTracks] = useState(() => createRadarTrackHistory(ENCOUNTER_SCENARIOS[0].targets));
   const [arpaTracks, setArpaTracks] = useState<ArpaTrackSet>({});
+  const [radarMeasurements, setRadarMeasurements] = useState(() => measureRadarContacts({ xNm: 0, yNm: 0 }, ENCOUNTER_SCENARIOS[0].targets, 0, 0));
   const shipRef = useRef<ShipDynamicsState>(ship);
   const targetsRef = useRef<VesselState[]>(targets);
   const tracksRef = useRef(tracks);
   const arpaTracksRef = useRef<ArpaTrackSet>({});
+  const radarMeasurementsRef = useRef(radarMeasurements);
+  const radarScanClockRef = useRef<RadarScanClock>({ lastScanSeconds: 0, scanNumber: 0 });
   const accumulatorRef = useRef(0);
 
   const updateShip = (update: (current: ShipDynamicsState) => ShipDynamicsState) => {
@@ -80,13 +84,28 @@ export default function App() {
         // Advance own ship and all traffic in one shared fixed-step clock.
         // This prevents the two sets of vessels from ever accumulating different time.
         const result = advanceFixedSteps(
-          { ownShip: shipRef.current, targets: targetsRef.current, tracks: tracksRef.current, arpa: arpaTracksRef.current },
+          { ownShip: shipRef.current, targets: targetsRef.current, tracks: tracksRef.current, arpa: arpaTracksRef.current, radarMeasurements: radarMeasurementsRef.current, radarScan: radarScanClockRef.current },
           elapsedSeconds,
           accumulatorRef.current,
           STEP_SECONDS,
           (current, dtSeconds) => {
             const nextOwnShip = stepShip(current.ownShip, dtSeconds);
             const nextTargets = current.targets.map((target) => advanceVessel(target, dtSeconds));
+            let nextMeasurements = current.radarMeasurements;
+            let nextScan = current.radarScan;
+            let nextArpa = current.arpa;
+            if (isRadarScanDue(nextOwnShip.elapsedSeconds, current.radarScan, DEFAULT_RADAR_CONFIG)) {
+              const scanNumber = current.radarScan.scanNumber + 1;
+              nextMeasurements = measureRadarContacts(
+                { xNm: nextOwnShip.eastNm, yNm: nextOwnShip.northNm },
+                nextTargets,
+                nextOwnShip.elapsedSeconds,
+                scanNumber,
+                DEFAULT_RADAR_CONFIG,
+              );
+              nextScan = { lastScanSeconds: nextOwnShip.elapsedSeconds, scanNumber };
+              nextArpa = updateArpaTracks(current.arpa, nextMeasurements, nextOwnShip.elapsedSeconds, 10);
+            }
             return {
               ownShip: nextOwnShip,
               targets: nextTargets,
@@ -94,7 +113,9 @@ export default function App() {
                 xNm: nextOwnShip.eastNm,
                 yNm: nextOwnShip.northNm,
               }),
-              arpa: updateArpaTracks(current.arpa, nextTargets, nextOwnShip.elapsedSeconds),
+              arpa: nextArpa,
+              radarMeasurements: nextMeasurements,
+              radarScan: nextScan,
             };
           },
         );
@@ -103,12 +124,15 @@ export default function App() {
         targetsRef.current = result.state.targets;
         tracksRef.current = result.state.tracks;
         arpaTracksRef.current = result.state.arpa;
+        radarMeasurementsRef.current = result.state.radarMeasurements;
+        radarScanClockRef.current = result.state.radarScan;
         accumulatorRef.current = result.accumulatorSeconds;
         if (result.stepsExecuted > 0) {
           setShip(result.state.ownShip);
           setTargets(result.state.targets);
           setTracks(result.state.tracks);
           setArpaTracks(result.state.arpa);
+          setRadarMeasurements(result.state.radarMeasurements);
         }
       }
 
@@ -136,6 +160,10 @@ export default function App() {
     setTracks(nextTracks);
     arpaTracksRef.current = {};
     setArpaTracks({});
+    const initialMeasurements = measureRadarContacts({ xNm: nextShip.eastNm, yNm: nextShip.northNm }, nextTargets, 0, 0, DEFAULT_RADAR_CONFIG);
+    radarMeasurementsRef.current = initialMeasurements;
+    setRadarMeasurements(initialMeasurements);
+    radarScanClockRef.current = { lastScanSeconds: 0, scanNumber: 0 };
   };
 
   const reset = () => {
@@ -152,12 +180,16 @@ export default function App() {
     setTracks(resetTracks);
     arpaTracksRef.current = {};
     setArpaTracks({});
+    const initialMeasurements = measureRadarContacts({ xNm: resetShip.eastNm, yNm: resetShip.northNm }, resetTargets, 0, 0, DEFAULT_RADAR_CONFIG);
+    radarMeasurementsRef.current = initialMeasurements;
+    setRadarMeasurements(initialMeasurements);
+    radarScanClockRef.current = { lastScanSeconds: 0, scanNumber: 0 };
   };
 
   const acquireTarget = (targetId: string) => {
-    const target = targetsRef.current.find((item) => item.id === targetId);
-    if (!target) return;
-    const next = { ...arpaTracksRef.current, [targetId]: acquireArpaTarget(target, shipRef.current.elapsedSeconds) };
+    const measurement = radarMeasurementsRef.current.find((item) => item.id === targetId);
+    if (!measurement) return;
+    const next = { ...arpaTracksRef.current, [targetId]: acquireArpaTarget(measurement, measurement.timeSeconds) };
     arpaTracksRef.current = next;
     setArpaTracks(next);
   };
@@ -186,7 +218,7 @@ export default function App() {
       <div className="side-link active"><Gauge size={17}/>Динамика судна</div>
       <div className="side-link"><Anchor size={17}/>Маневрирование</div>
       <div className="side-link"><Waves size={17}/>Внешняя среда</div>
-      <div className="sidebar-foot">SIM CORE · 0.9.0</div>
+      <div className="sidebar-foot">SIM CORE · 0.10.0</div>
     </aside>
     <section className="workspace">
       <header className="topbar">
@@ -224,8 +256,11 @@ export default function App() {
             <circle cx={x} cy={y} r={vrmRadiusPx} className="vrm-ring"/>
             <path d={"M" + x + " " + y + " L" + eblX + " " + eblY} className="ebl-line"/>
             <text x={x + 9} y={y - 10}>EBL {eblBearingDeg.toFixed(0)}°T</text>
-            {targets.map((target) => {
-              const point = projectRelativePosition(ownVessel, target, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
+            {radarMeasurements.map((measurement) => {
+              const target = targets.find((item) => item.id === measurement.id);
+              if (!target) return null;
+              const track = arpaTracks[measurement.id];
+              const point = projectRelativePosition(ownVessel, measurement, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER);
               const history = tracks[target.id] ?? [];
               const trailPoints = [...history, {
                 xNm: target.xNm - ownVessel.xNm,
@@ -235,7 +270,12 @@ export default function App() {
                 .map((sample) => projectRelativePosition({ xNm: 0, yNm: 0 }, sample, RADAR_RANGE_NM, RADAR_RADIUS_PX, RADAR_CENTER))
                 .filter((sample) => Math.hypot(sample.x - RADAR_CENTER, sample.y - RADAR_CENTER) <= RADAR_RADIUS_PX);
               const trailPath = trailPoints.map((sample) => sample.x.toFixed(1) + "," + sample.y.toFixed(1)).join(" ");
-              const vector = motionVectorToRadar(ownVessel, target, vectorMode, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX);
+              const estimatedTarget = track?.estimatedCourseDeg !== null && track?.estimatedCourseDeg !== undefined && track.estimatedSpeedKn !== null
+                ? { courseDeg: track.estimatedCourseDeg, speedKn: track.estimatedSpeedKn }
+                : null;
+              const vector = estimatedTarget
+                ? motionVectorToRadar(ownVessel, estimatedTarget, vectorMode, RADAR_VECTOR_MINUTES, RADAR_RANGE_NM, RADAR_RADIUS_PX)
+                : { dx: 0, dy: 0 };
               const vectorLength = Math.hypot(vector.dx, vector.dy);
               const unitX = vectorLength > 0 ? vector.dx / vectorLength : 0;
               const unitY = vectorLength > 0 ? vector.dy / vectorLength : 0;
@@ -250,11 +290,11 @@ export default function App() {
               return <g key={target.id}>
                 {trailPoints.length > 1 && <polyline points={trailPath} className="target-trail"/>}
                 <g transform={"translate(" + point.x + " " + point.y + ")"}>
-                <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>
-                {vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
+                {estimatedTarget && <path d={"M0 0 L" + vector.dx + " " + vector.dy} className="target-vector"/>}
+                {estimatedTarget && vectorLength > 0 && <path d={arrowHead} className="target-vector-head"/>}
                 <circle r="7" className="target-echo"/>
                 <text x="12" y="4">{target.id}</text>
-                <text x="12" y="17" className="target-course-label">{target.courseDeg.toFixed(0)}°T</text>
+                <text x="12" y="17" className="target-course-label">{estimatedTarget ? estimatedTarget.courseDeg.toFixed(0) + "°T" : "RADAR ECHO"}</text>
                 </g>
               </g>;
             })}
@@ -310,7 +350,9 @@ export default function App() {
         <div className="cpa-table-wrap"><table className="cpa-table arpa-table"><thead><tr><th>Цель</th><th>Статус</th><th>Оценка курса / скорости</th><th>TCPA</th><th>DCPA</th><th>Действие</th></tr></thead><tbody>
           {targets.map((target) => {
             const track = arpaTracks[target.id];
-            const solution = track ? calculateArpaSolution(track, target, ownVessel) : null;
+            const latestMeasurement = radarMeasurements.find((item) => item.id === target.id) ??
+              (track?.measurements.length ? track.measurements[track.measurements.length - 1] : null);
+            const solution = track && latestMeasurement ? calculateArpaSolution(track, latestMeasurement, ownVessel) : null;
             const statusLabel = !track ? "Не захвачена" : track.status === "acquiring" ? "Захват" : track.status === "tracking" ? "Сопровождение" : "Потеряна";
             return <tr key={target.id}>
               <td>{target.id}</td>
@@ -320,17 +362,17 @@ export default function App() {
                 : "Недостаточно данных"}</td>
               <td>{solution ? formatMinutes(solution.tcpaMin) : "—"}</td>
               <td>{solution?.dcpaNm !== null && solution?.dcpaNm !== undefined ? solution.dcpaNm.toFixed(2) + " NM" : "—"}</td>
-              <td>{track ? <button className="secondary arpa-action" onClick={() => releaseTarget(target.id)}>Снять</button> : <button className="primary arpa-action" onClick={() => acquireTarget(target.id)}>Захватить</button>}</td>
+              <td>{track ? <button className="secondary arpa-action" onClick={() => releaseTarget(target.id)}>Снять</button> : <button className="primary arpa-action" disabled={!radarMeasurements.some((item) => item.id === target.id)} onClick={() => acquireTarget(target.id)}>Захватить</button>}</td>
             </tr>;
           })}
         </tbody></table></div>
-        <p className="cpa-note">Захват выполняется вручную. После второго измерения через 5 секунд появляется оценка вектора; скорость и курс вычисляются по последовательности координат методом линейной регрессии. Потеря фиксируется при отсутствии измерений более 15 секунд. CPA/TCPA рассчитываются по оценённой скорости цели и текущей скорости собственного судна.</p>
+        <p className="cpa-note">Захват выполняется вручную по текущей радиолокационной отметке. Антенна выполняет обзор каждые 2,5 секунды; дальность и пеленг содержат небольшую детерминированную погрешность. ARPA оценивает движение только по измеренным координатам. Пропуск отметок воспроизводится детерминированно; Lost фиксируется при отсутствии измерений более 10 секунд.</p>
       </section>
       <section className="panel debrief-panel">
         <div className="eyebrow">КОНТРОЛЬНЫЕ ВОПРОСЫ</div><h2>Разбор после выполнения</h2>
         <ul>{activeScenario.debrief.map((item,index)=><li key={index}>{item}</li>)}</ul>
       </section>
-      <div className="notice"><b>Ограничение учебной модели:</b> цели движутся по заданным постоянным курсам и скоростям. Их манёвры, ускорение, дрейф, ветер и течение пока не моделируются. Пересчёт CPA/TCPA не является полноценным ARPA и не оценивает автоматически правильность манёвра. Сценарии предназначены для обучения, а не для реального судовождения.</div>
+      <div className="notice"><b>Ограничение учебной модели:</b> радарный обзор, шум и пропуски отметок являются детерминированной упрощённой моделью. Нет моделирования диаграммы направленности антенны, мощности передатчика, отражательной способности, затенения, многолучёвости, Sea/Rain Clutter и ложных целей. Исторический след пока строится по координатам сценария, а не по радиолокационным отметкам. ARPA не является сертифицированным прибором. Сценарии предназначены для обучения, а не для реального судовождения.</div>
     </section>
   </main>;
 }
